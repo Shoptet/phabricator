@@ -4,8 +4,8 @@
       "type": "client",
       "port": 22280,
       "listen": "0.0.0.0",
-      "ssl.key": null,
-      "ssl.cert": null,
+      "ssl.key": "/etc/ssl/shoptet.cz.key",
+      "ssl.cert": "/etc/ssl/shoptet.cz.crt",
       "ssl.chain": null
     },
     {

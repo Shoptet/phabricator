@@ -174,3 +174,15 @@
 .phui-workcard.drag-clone.phui-object-item-bar-color-sky {
   background-color: {$sh-bluebackground};
 }
+
+.phui-object-item-status-resolved.phui-workcard {
+  background-color: #f9f7a9 !important;
+}
+
+.phui-object-item-status-released.phui-workcard {
+  background-color: #c9ffe4 !important;
+}
+
+.phui-object-item-status-resolvednr.phui-workcard {
+  background-color: #f2fff8 !important;
+}

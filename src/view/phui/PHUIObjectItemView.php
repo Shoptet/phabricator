@@ -279,6 +279,10 @@ final class PHUIObjectItemView extends AphrontTagView {
       $item_classes[] = 'phui-object-item-grippable';
     }
 
+    if (isset($this->object) && $this->object instanceof ManiphestTask) {
+      $item_classes[] = 'phui-object-item-status-'.$this->object->getStatus();
+    }
+
     if ($this->getImageURI()) {
       $item_classes[] = 'phui-object-item-with-image';
     }
