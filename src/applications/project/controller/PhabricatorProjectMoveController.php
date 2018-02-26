@@ -131,10 +131,15 @@ final class PhabricatorProjectMoveController
       return array();
     }
 
-    $try = array(
-      array($after_task, true),
-      array($before_task, false),
-    );
+    // Fercak - T5824 - allow changing order of tasks within the same priority
+    // but disable changing task's priority during drag & drop.
+    $try = array();
+    if ($after_task && $after_task->getPriority() == $task->getPriority()) {
+      $try[] = array($after_task, true);
+    }
+    if ($before_task && $before_task->getPriority() == $task->getPriority()) {
+      $try[] = array($before_task, false);
+    }
 
     $pri = null;
     $sub = null;
