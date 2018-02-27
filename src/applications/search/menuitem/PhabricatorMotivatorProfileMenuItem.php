@@ -14,7 +14,7 @@ final class PhabricatorMotivatorProfileMenuItem
   }
 
   public function canAddToObject($object) {
-    return true;
+    return ($object instanceof PhabricatorHomeApplication);
   }
 
   public function getDisplayName(
@@ -59,31 +59,18 @@ final class PhabricatorMotivatorProfileMenuItem
       case 'catfacts':
       default:
         $facts = $this->getCatFacts();
+        $fact_name = pht('Cat Facts');
+        $fact_icon = 'fa-paw';
         break;
     }
 
-    $fact = $this->selectFact($facts);
-
-    switch ($source) {
-      case 'catfacts':
-      default:
-        $fact = array(
-          id(new PHUIIconView())->setIcon('fa-paw'),
-          ' ',
-          $fact,
-        );
-        break;
-    }
-
-    $fact = phutil_tag(
-      'div',
-      array(
-        'class' => 'phui-motivator',
-      ),
-      $fact);
+    $fact_text = $this->selectFact($facts);
 
     $item = $this->newItem()
-      ->appendChild($fact);
+      ->setName($fact_name)
+      ->setIcon($fact_icon)
+      ->setTooltip($fact_text)
+      ->setHref('#');
 
     return array(
       $item,
@@ -93,7 +80,7 @@ final class PhabricatorMotivatorProfileMenuItem
   private function getCatFacts() {
     return array(
       pht('Cats purr when they are happy, upset, or asleep.'),
-      pht('The first cats evolved on the savanah about 8,000 years ago.'),
+      pht('The first cats evolved on the savannah about 8,000 years ago.'),
       pht(
         'Cats have a tail, two feet, between one and three ears, and two '.
         'other feet.'),
@@ -124,7 +111,7 @@ final class PhabricatorMotivatorProfileMenuItem
       pht(
         'Not all cats can retract their claws, but most of them can.'),
       pht(
-        'In the wild, cats and racoons sometimes hunt together in packs.'),
+        'In the wild, cats and raccoons sometimes hunt together in packs.'),
       pht(
         'The Spanish word for cat is "cato". The biggest cat is called '.
         '"el cato".'),
@@ -144,6 +131,15 @@ final class PhabricatorMotivatorProfileMenuItem
         'Cats will often bring you their prey because they feel sorry '.
         'for your inability to hunt.'),
       pht('Cats spend most of their time plotting to kill their owner.'),
+      pht('Outside of the CAT scan, cats have made almost no contributions '.
+        'to modern medicine.'),
+      pht('In ancient Egypt, the cat-god Horus watched over all cats.'),
+      pht('The word "catastrophe" has no etymological relationship to the '.
+          'word "cat".'),
+      pht('Many cats appear black in low light, suffering a -2 modifier to '.
+          'luck rolls.'),
+      pht('The popular trivia game "World of Warcraft" features a race of '.
+          'cat people called the Khajiit.'),
     );
   }
 

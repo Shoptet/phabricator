@@ -13,6 +13,11 @@ final class PhabricatorProjectDetailsProfileMenuItem
     return pht('Project Details');
   }
 
+  public function canHideMenuItem(
+    PhabricatorProfileMenuItemConfiguration $config) {
+    return false;
+  }
+
   public function canMakeDefault(
     PhabricatorProfileMenuItemConfiguration $config) {
     return true;
@@ -46,15 +51,15 @@ final class PhabricatorProjectDetailsProfileMenuItem
     $project = $config->getProfileObject();
 
     $id = $project->getID();
-    $picture = $project->getProfileImageURI();
     $name = $project->getName();
+    $icon = $project->getDisplayIconIcon();
 
     $href = "/project/profile/{$id}/";
 
     $item = $this->newItem()
       ->setHref($href)
       ->setName($name)
-      ->setProfileImage($picture);
+      ->setIcon($icon);
 
     return array(
       $item,

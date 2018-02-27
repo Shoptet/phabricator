@@ -39,11 +39,14 @@ final class PhabricatorPeopleUserPHIDType extends PhabricatorPHIDType {
     foreach ($handles as $phid => $handle) {
       $user = $objects[$phid];
       $realname = $user->getRealName();
+      $username = $user->getUsername();
 
-      $handle->setName($user->getUsername());
-      $handle->setURI('/p/'.$user->getUsername().'/');
-      $handle->setFullName($user->getFullName());
-      $handle->setImageURI($user->getProfileImageURI());
+      $handle
+        ->setName($username)
+        ->setURI('/p/'.$username.'/')
+        ->setFullName($user->getFullName())
+        ->setImageURI($user->getProfileImageURI())
+        ->setMailStampName('@'.$username);
 
       if ($user->getIsMailingList()) {
         $handle->setIcon('fa-envelope-o');
@@ -61,8 +64,10 @@ final class PhabricatorPeopleUserPHIDType extends PhabricatorPHIDType {
       }
 
       $availability = null;
-      if (!$user->isUserActivated()) {
+      if ($user->getIsDisabled()) {
         $availability = PhabricatorObjectHandle::AVAILABILITY_DISABLED;
+      } else if (!$user->isResponsive()) {
+        $availability = PhabricatorObjectHandle::AVAILABILITY_NOEMAIL;
       } else {
         $until = $user->getAwayUntil();
         if ($until) {

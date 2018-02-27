@@ -134,7 +134,7 @@ abstract class PhabricatorAuthController extends PhabricatorController {
     // checks later on to make sure this account is valid for the intended
     // operation. This requires edit permission for completeness and consistency
     // but it won't actually be meaningfully checked because we're using the
-    // ominpotent user.
+    // omnipotent user.
 
     $account = id(new PhabricatorExternalAccountQuery())
       ->setViewer(PhabricatorUser::getOmnipotentUser())
@@ -194,7 +194,7 @@ abstract class PhabricatorAuthController extends PhabricatorController {
     // hijacking registration sessions.
 
     $actual = $account->getProperty('registrationKey');
-    $expect = PhabricatorHash::digest($registration_key);
+    $expect = PhabricatorHash::weakDigest($registration_key);
     if (!phutil_hashes_are_identical($actual, $expect)) {
       $response = $this->renderError(
         pht(

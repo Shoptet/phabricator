@@ -32,7 +32,7 @@ final class PhabricatorDashboard extends PhabricatorDashboardDAO
     return id(new PhabricatorDashboard())
       ->setName('')
       ->setIcon('fa-dashboard')
-      ->setViewPolicy(PhabricatorPolicies::POLICY_USER)
+      ->setViewPolicy(PhabricatorPolicies::getMostOpenPolicy())
       ->setEditPolicy($actor->getPHID())
       ->setStatus(self::STATUS_ACTIVE)
       ->setAuthorPHID($actor->getPHID())
@@ -45,16 +45,6 @@ final class PhabricatorDashboard extends PhabricatorDashboardDAO
       self::STATUS_ACTIVE => pht('Active'),
       self::STATUS_ARCHIVED => pht('Archived'),
     );
-  }
-
-  public static function copyDashboard(
-    PhabricatorDashboard $dst,
-    PhabricatorDashboard $src) {
-
-    $dst->name = $src->name;
-    $dst->layoutConfig = $src->layoutConfig;
-
-    return $dst;
   }
 
   protected function getConfiguration() {
@@ -84,7 +74,15 @@ final class PhabricatorDashboard extends PhabricatorDashboardDAO
 
   public function setLayoutConfigFromObject(
     PhabricatorDashboardLayoutConfig $object) {
+
     $this->setLayoutConfig($object->toDictionary());
+
+    // See PHI385. Dashboard panel mutations rely on changes to the Dashboard
+    // object persisting when transactions are applied, but this assumption is
+    // no longer valid after T13054. For now, just save the dashboard
+    // explicitly.
+    $this->save();
+
     return $this;
   }
 

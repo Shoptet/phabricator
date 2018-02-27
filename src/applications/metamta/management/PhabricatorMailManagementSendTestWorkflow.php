@@ -48,6 +48,11 @@ final class PhabricatorMailManagementSendTestWorkflow
             'repeat'  => true,
           ),
           array(
+            'name' => 'mailer',
+            'param' => 'key',
+            'help' => pht('Send with a specific configured mailer.'),
+          ),
+          array(
             'name'    => 'html',
             'help'    => pht('Send as HTML mail.'),
           ),
@@ -93,7 +98,16 @@ final class PhabricatorMailManagementSendTestWorkflow
       ->execute();
     $users = mpull($users, null, 'getUsername');
 
+    $raw_tos = array();
     foreach ($tos as $key => $username) {
+      // If the recipient has an "@" in any noninitial position, treat this as
+      // a raw email address.
+      if (preg_match('/.@/', $username)) {
+        $raw_tos[] = $username;
+        unset($tos[$key]);
+        continue;
+      }
+
       if (empty($users[$username])) {
         throw new PhutilArgumentUsageException(
           pht("No such user '%s' exists.", $username));
@@ -122,12 +136,19 @@ final class PhabricatorMailManagementSendTestWorkflow
     $body = file_get_contents('php://stdin');
 
     $mail = id(new PhabricatorMetaMTAMail())
-      ->addTos($tos)
       ->addCCs($ccs)
       ->setSubject($subject)
       ->setBody($body)
       ->setIsBulk($is_bulk)
       ->setMailTags($tags);
+
+    if ($tos) {
+      $mail->addTos($tos);
+    }
+
+    if ($raw_tos) {
+      $mail->addRawTos($raw_tos);
+    }
 
     if ($args->getArg('html')) {
       $mail->setBody(
@@ -143,6 +164,21 @@ final class PhabricatorMailManagementSendTestWorkflow
 
     if ($from) {
       $mail->setFrom($from->getPHID());
+    }
+
+    $mailer_key = $args->getArg('mailer');
+    if ($mailer_key !== null) {
+      $mailers = PhabricatorMetaMTAMail::newMailers();
+      $mailers = mpull($mailers, null, 'getKey');
+      if (!isset($mailers[$mailer_key])) {
+        throw new PhutilArgumentUsageException(
+          pht(
+            'Mailer key ("%s") is not configured. Available keys are: %s.',
+            $mailer_key,
+            implode(', ', array_keys($mailers))));
+      }
+
+      $mail->setTryMailers(array($mailer_key));
     }
 
     foreach ($attach as $attachment) {

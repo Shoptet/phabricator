@@ -7,6 +7,8 @@ final class HeraldPreCommitContentAdapter extends HeraldPreCommitAdapter {
   private $fields;
   private $revision = false;
 
+  private $affectedPackages;
+
   public function getAdapterContentName() {
     return pht('Commit Hook: Commit Content');
   }
@@ -37,7 +39,7 @@ final class HeraldPreCommitContentAdapter extends HeraldPreCommitAdapter {
   public function getDiffContent($type) {
     if ($this->changesets === null) {
       try {
-        $this->changesets = $this->getHookEngine()->loadChangesetsForCommit(
+        $this->changesets = $this->getHookEngine()->getChangesetsForCommit(
           $this->getObject()->getRefNew());
       } catch (Exception $ex) {
         $this->changesets = $ex;
@@ -46,7 +48,7 @@ final class HeraldPreCommitContentAdapter extends HeraldPreCommitAdapter {
 
     if ($this->changesets instanceof Exception) {
       $ex_class = get_class($this->changesets);
-      $ex_message = $this->changesets->getmessage();
+      $ex_message = $this->changesets->getMessage();
       if ($type === 'name') {
         return array("<{$ex_class}: {$ex_message}>");
       } else {
@@ -190,7 +192,7 @@ final class HeraldPreCommitContentAdapter extends HeraldPreCommitAdapter {
         $this->revision = id(new DifferentialRevisionQuery())
           ->setViewer(PhabricatorUser::getOmnipotentUser())
           ->withIDs(array($revision_id))
-          ->needRelationships(true)
+          ->needReviewers(true)
           ->executeOne();
       }
     }
@@ -222,5 +224,17 @@ final class HeraldPreCommitContentAdapter extends HeraldPreCommitAdapter {
     return $this->getHookEngine()->loadBranches(
       $this->getObject()->getRefNew());
   }
+
+  public function loadAffectedPackages() {
+    if ($this->affectedPackages === null) {
+      $packages = PhabricatorOwnersPackage::loadAffectedPackages(
+        $this->getHookEngine()->getRepository(),
+        $this->getDiffContent('name'));
+      $this->affectedPackages = $packages;
+    }
+
+    return $this->affectedPackages;
+  }
+
 
 }

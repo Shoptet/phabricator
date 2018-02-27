@@ -61,11 +61,14 @@ of each approach are:
       a normal recipient and also Cc'd on a mailing list.
     - Getting threading to work properly is harder, and probably requires
       making mail less useful by turning off options.
-    - Sometimes people will "Reply All" and everyone will get two mails,
-      one from the user and one from Phabricator turning their mail into
-      a comment.
+    - Sometimes people will "Reply All", which can send mail to too many
+      recipients. Phabricator will try not to send mail to users who already
+      received a similar message, but can not prevent all stray email arising
+      from "Reply All".
     - Not supported with a private reply-to address.
-    - Mails are sent in the server default translation.
+    - Mail messages are sent in the server default translation.
+    - Mail that must be delivered over secure channels will leak the recipient
+      list in the "To" and "Cc" headers.
   - One mail to each user:
     - Policy controls work correctly and are enforced per-user.
     - Recipients need to look in the mail body to see To/Cc.
@@ -73,9 +76,10 @@ of each approach are:
       mail.
     - Getting threading to work properly is easier, and threading settings
       can be customzied by each user.
-    - "Reply All" no longer spams all other users.
+    - "Reply All" will never send extra mail to other users involved in the
+      thread.
     - Required if private reply-to addresses are configured.
-    - Mails are sent in the language of user preference.
+    - Mail messages are sent in the language of user preference.
 
 EODOC
 ));
@@ -141,15 +145,14 @@ Adapter class to use to transmit mail to the MTA. The default uses
 PHPMailerLite, which will invoke "sendmail". This is appropriate if sendmail
 actually works on your host, but if you haven't configured mail it may not be so
 great. A number of other mailers are available (e.g., SES, SendGrid, SMTP,
-custom mailers), consult "Configuring Outbound Email" in the documentation for
-details.
+custom mailers). This option is deprecated in favor of 'cluster.mailers'.
 EODOC
 ));
 
     $placeholder_description = $this->deformat(pht(<<<EODOC
-When sending a message that has no To recipient (i.e. all recipients are CC'd,
-for example when multiplexing mail), set the To field to the following value. If
-no value is set, messages with no To will have their CCs upgraded to To.
+When sending a message that has no To recipient (i.e. all recipients are CC'd),
+set the To field to the following value. If no value is set, messages with no
+To will have their CCs upgraded to To.
 EODOC
 ));
 
@@ -191,7 +194,18 @@ The default is `full`.
 EODOC
 ));
 
+    $mailers_description = $this->deformat(pht(<<<EODOC
+Define one or more mail transmission services. For help with configuring
+mailers, see **[[ %s | %s ]]** in the documentation.
+EODOC
+      ,
+      PhabricatorEnv::getDoclink('Configuring Outbound Email'),
+      pht('Configuring Outbound Email')));
+
     return array(
+      $this->newOption('cluster.mailers', 'cluster.mailers', null)
+        ->setHidden(true)
+        ->setDescription($mailers_description),
       $this->newOption(
         'metamta.default-address',
         'string',
@@ -295,9 +309,9 @@ EODOC
       $this->newOption('metamta.user-address-format', 'enum', 'full')
         ->setEnumOptions(
           array(
-            'short' => 'short',
-            'real' => 'real',
-            'full' => 'full',
+            'short' => pht('Short'),
+            'real' => pht('Real'),
+            'full' => pht('Full'),
           ))
         ->setSummary(pht('Control how Phabricator renders user names in mail.'))
         ->setDescription($address_description)

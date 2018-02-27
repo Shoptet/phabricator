@@ -17,6 +17,8 @@ abstract class PhabricatorEditField extends Phobject {
   private $previewPanel;
   private $controlID;
   private $controlInstructions;
+  private $bulkEditLabel;
+  private $bulkEditGroupKey;
 
   private $description;
   private $conduitDescription;
@@ -25,6 +27,7 @@ abstract class PhabricatorEditField extends Phobject {
 
   private $commentActionLabel;
   private $commentActionValue;
+  private $commentActionGroupKey;
   private $commentActionOrder = 1000;
   private $hasCommentActionValue;
 
@@ -35,6 +38,7 @@ abstract class PhabricatorEditField extends Phobject {
   private $isEditDefaults;
   private $isSubmittedForm;
   private $controlError;
+  private $canApplyWithoutEditCapability = false;
 
   private $isReorderable = true;
   private $isDefaultable = true;
@@ -43,6 +47,7 @@ abstract class PhabricatorEditField extends Phobject {
   private $isConduitOnly = false;
 
   private $conduitEditTypes;
+  private $bulkEditTypes;
 
   public function setKey($key) {
     $this->key = $key;
@@ -60,6 +65,24 @@ abstract class PhabricatorEditField extends Phobject {
 
   public function getLabel() {
     return $this->label;
+  }
+
+  public function setBulkEditLabel($bulk_edit_label) {
+    $this->bulkEditLabel = $bulk_edit_label;
+    return $this;
+  }
+
+  public function getBulkEditLabel() {
+    return $this->bulkEditLabel;
+  }
+
+  public function setBulkEditGroupKey($key) {
+    $this->bulkEditGroupKey = $key;
+    return $this;
+  }
+
+  public function getBulkEditGroupKey() {
+    return $this->bulkEditGroupKey;
   }
 
   public function setViewer(PhabricatorUser $viewer) {
@@ -245,6 +268,15 @@ abstract class PhabricatorEditField extends Phobject {
     return $this->commentActionLabel;
   }
 
+  public function setCommentActionGroupKey($key) {
+    $this->commentActionGroupKey = $key;
+    return $this;
+  }
+
+  public function getCommentActionGroupKey() {
+    return $this->commentActionGroupKey;
+  }
+
   public function setCommentActionOrder($order) {
     $this->commentActionOrder = $order;
     return $this;
@@ -280,6 +312,15 @@ abstract class PhabricatorEditField extends Phobject {
 
   public function getControlInstructions() {
     return $this->controlInstructions;
+  }
+
+  public function setCanApplyWithoutEditCapability($can_apply) {
+    $this->canApplyWithoutEditCapability = $can_apply;
+    return $this;
+  }
+
+  public function getCanApplyWithoutEditCapability() {
+    return $this->canApplyWithoutEditCapability;
   }
 
   protected function newControl() {
@@ -605,6 +646,24 @@ abstract class PhabricatorEditField extends Phobject {
     return new AphrontStringHTTPParameterType();
   }
 
+  protected function getBulkParameterType() {
+    $type = $this->newBulkParameterType();
+
+    if (!$type) {
+      return null;
+    }
+
+    $type
+      ->setField($this)
+      ->setViewer($this->getViewer());
+
+    return $type;
+  }
+
+  protected function newBulkParameterType() {
+    return null;
+  }
+
   public function getConduitParameterType() {
     $type = $this->newConduitParameterType();
 
@@ -632,43 +691,49 @@ abstract class PhabricatorEditField extends Phobject {
   }
 
   protected function newEditType() {
-    $parameter_type = $this->getConduitParameterType();
-    if (!$parameter_type) {
-      return null;
-    }
-
-    return id(new PhabricatorSimpleEditType())
-      ->setConduitParameterType($parameter_type);
+    return new PhabricatorSimpleEditType();
   }
 
   protected function getEditType() {
     $transaction_type = $this->getTransactionType();
-
     if ($transaction_type === null) {
       return null;
     }
 
-    $type_key = $this->getEditTypeKey();
     $edit_type = $this->newEditType();
     if (!$edit_type) {
       return null;
     }
 
-    return $edit_type
-      ->setEditType($type_key)
+    $type_key = $this->getEditTypeKey();
+
+    $edit_type
+      ->setEditField($this)
       ->setTransactionType($transaction_type)
+      ->setEditType($type_key)
       ->setMetadata($this->getMetadata());
+
+    if (!$edit_type->getConduitParameterType()) {
+      $conduit_parameter = $this->getConduitParameterType();
+      if ($conduit_parameter) {
+        $edit_type->setConduitParameterType($conduit_parameter);
+      }
+    }
+
+    if (!$edit_type->getBulkParameterType()) {
+      $bulk_parameter = $this->getBulkParameterType();
+      if ($bulk_parameter) {
+        $edit_type->setBulkParameterType($bulk_parameter);
+      }
+    }
+
+    return $edit_type;
   }
 
   final public function getConduitEditTypes() {
     if ($this->conduitEditTypes === null) {
       $edit_types = $this->newConduitEditTypes();
       $edit_types = mpull($edit_types, null, 'getEditType');
-
-      foreach ($edit_types as $edit_type) {
-        $edit_type->setEditField($this);
-      }
-
       $this->conduitEditTypes = $edit_types;
     }
 
@@ -689,6 +754,39 @@ abstract class PhabricatorEditField extends Phobject {
   }
 
   protected function newConduitEditTypes() {
+    $edit_type = $this->getEditType();
+
+    if (!$edit_type) {
+      return array();
+    }
+
+    return array($edit_type);
+  }
+
+  final public function getBulkEditTypes() {
+    if ($this->bulkEditTypes === null) {
+      $edit_types = $this->newBulkEditTypes();
+      $edit_types = mpull($edit_types, null, 'getEditType');
+      $this->bulkEditTypes = $edit_types;
+    }
+
+    return $this->bulkEditTypes;
+  }
+
+  final public function getBulkEditType($key) {
+    $edit_types = $this->getBulkEditTypes();
+
+    if (empty($edit_types[$key])) {
+      throw new Exception(
+        pht(
+          'This EditField does not provide a Bulk EditType with key "%s".',
+          $key));
+    }
+
+    return $edit_types[$key];
+  }
+
+  protected function newBulkEditTypes() {
     $edit_type = $this->getEditType();
 
     if (!$edit_type) {
@@ -719,7 +817,8 @@ abstract class PhabricatorEditField extends Phobject {
       ->setKey($this->getKey())
       ->setLabel($label)
       ->setValue($this->getValueForCommentAction($value))
-      ->setOrder($this->getCommentActionOrder());
+      ->setOrder($this->getCommentActionOrder())
+      ->setGroupKey($this->getCommentActionGroupKey());
 
     return $action;
   }

@@ -1,7 +1,10 @@
 <?php
 
-final class DifferentialChangeset extends DifferentialDAO
-  implements PhabricatorPolicyInterface {
+final class DifferentialChangeset
+  extends DifferentialDAO
+  implements
+    PhabricatorPolicyInterface,
+    PhabricatorDestructibleInterface {
 
   protected $diffID;
   protected $oldFile;
@@ -75,6 +78,23 @@ final class DifferentialChangeset extends DifferentialDAO
     return $name;
   }
 
+  public function getOwnersFilename() {
+    // TODO: For Subversion, we should adjust these paths to be relative to
+    // the repository root where possible.
+
+    $path = $this->getFilename();
+
+    if (!isset($path[0])) {
+      return '/';
+    }
+
+    if ($path[0] != '/') {
+      $path = '/'.$path;
+    }
+
+    return $path;
+  }
+
   public function addUnsavedHunk(DifferentialHunk $hunk) {
     if ($this->hunks === self::ATTACHABLE) {
       $this->hunks = array();
@@ -98,11 +118,11 @@ final class DifferentialChangeset extends DifferentialDAO
   public function delete() {
     $this->openTransaction();
 
-      $modern_hunks = id(new DifferentialModernHunk())->loadAllWhere(
+      $hunks = id(new DifferentialHunk())->loadAllWhere(
         'changesetID = %d',
         $this->getID());
-      foreach ($modern_hunks as $modern_hunk) {
-        $modern_hunk->delete();
+      foreach ($hunks as $hunk) {
+        $hunk->delete();
       }
 
       $this->unsavedHunks = array();
@@ -153,7 +173,7 @@ final class DifferentialChangeset extends DifferentialDAO
   }
 
   public function getAnchorName() {
-    return substr(md5($this->getFilename()), 0, 8);
+    return 'change-'.PhabricatorHash::digestForAnchor($this->getFilename());
   }
 
   public function getAbsoluteRepositoryPath(
@@ -201,6 +221,51 @@ final class DifferentialChangeset extends DifferentialDAO
     return $this->assertAttached($this->diff);
   }
 
+  public function newFileTreeIcon() {
+    $file_type = $this->getFileType();
+    $change_type = $this->getChangeType();
+
+    $change_icons = array(
+      DifferentialChangeType::TYPE_DELETE => 'fa-file-o',
+    );
+
+    if (isset($change_icons[$change_type])) {
+      $icon = $change_icons[$change_type];
+    } else {
+      $icon = DifferentialChangeType::getIconForFileType($file_type);
+    }
+
+    $change_colors = array(
+      DifferentialChangeType::TYPE_ADD => 'green',
+      DifferentialChangeType::TYPE_DELETE => 'red',
+      DifferentialChangeType::TYPE_MOVE_AWAY => 'orange',
+      DifferentialChangeType::TYPE_MOVE_HERE => 'orange',
+      DifferentialChangeType::TYPE_COPY_HERE => 'orange',
+      DifferentialChangeType::TYPE_MULTICOPY => 'orange',
+    );
+
+    $color = idx($change_colors, $change_type, 'bluetext');
+
+    return id(new PHUIIconView())
+      ->setIcon($icon.' '.$color);
+  }
+
+  public function getFileTreeClass() {
+    switch ($this->getChangeType()) {
+      case DifferentialChangeType::TYPE_ADD:
+        return 'filetree-added';
+      case DifferentialChangeType::TYPE_DELETE:
+        return 'filetree-deleted';
+      case DifferentialChangeType::TYPE_MOVE_AWAY:
+      case DifferentialChangeType::TYPE_MOVE_HERE:
+      case DifferentialChangeType::TYPE_COPY_HERE:
+      case DifferentialChangeType::TYPE_MULTICOPY:
+        return 'filetree-movecopy';
+    }
+
+    return null;
+  }
+
 
 /* -(  PhabricatorPolicyInterface  )----------------------------------------- */
 
@@ -218,5 +283,26 @@ final class DifferentialChangeset extends DifferentialDAO
   public function hasAutomaticCapability($capability, PhabricatorUser $viewer) {
     return $this->getDiff()->hasAutomaticCapability($capability, $viewer);
   }
+
+
+/* -(  PhabricatorDestructibleInterface  )----------------------------------- */
+
+
+  public function destroyObjectPermanently(
+    PhabricatorDestructionEngine $engine) {
+    $this->openTransaction();
+
+      $hunks = id(new DifferentialHunk())->loadAllWhere(
+        'changesetID = %d',
+        $this->getID());
+      foreach ($hunks as $hunk) {
+        $engine->destroyObject($hunk);
+      }
+
+      $this->delete();
+
+    $this->saveTransaction();
+  }
+
 
 }

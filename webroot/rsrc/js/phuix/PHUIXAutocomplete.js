@@ -107,6 +107,12 @@ JX.install('PHUIXAutocomplete', {
         prior = '<start>';
       }
 
+      // If this is a repeating sequence and the previous character is the
+      // same as the one the user just typed, like "((", don't reactivate.
+      if (prior === String.fromCharCode(code)) {
+        return;
+      }
+
       switch (prior) {
         case '<start>':
         case ' ':
@@ -118,7 +124,6 @@ JX.install('PHUIXAutocomplete', {
         case '|': // Might be a table cell.
         case '>': // Might be a blockquote.
         case '!': // Might be a blockquote attribution line.
-        case ':': // Might be a "NOTE:".
           // We'll let these autocomplete.
           break;
         default:
@@ -128,7 +133,7 @@ JX.install('PHUIXAutocomplete', {
       }
 
       // Get all the text on the current line. If the line only contains
-      // whitespace, don't actiavte: the user is probably typing code or a
+      // whitespace, don't activate: the user is probably typing code or a
       // numbered list.
       var line = area.value.substring(0, head - 1);
       line = line.split('\n');
@@ -154,7 +159,6 @@ JX.install('PHUIXAutocomplete', {
         datasource.setTransformer(JX.bind(this, this._transformresult));
         datasource.setSortHandler(
           JX.bind(datasource, JX.Prefab.sortHandler, {}));
-        datasource.setFilterHandler(JX.Prefab.filterClosedResults);
 
         this._datasources[code] = datasource;
       }
@@ -201,7 +205,7 @@ JX.install('PHUIXAutocomplete', {
       // to press Alt to type characters like "@" on a German keyboard layout.
       // The cost of misfiring autocompleters is very small since we do not
       // eat the keystroke. See T10252.
-      if (r.metaKey || r.ctrlKey) {
+      if (r.metaKey || (r.ctrlKey && !r.altKey)) {
         return;
       }
 
@@ -337,11 +341,17 @@ JX.install('PHUIXAutocomplete', {
     _getCancelCharacters: function() {
       // The "." character does not cancel because of projects named
       // "node.js" or "blog.mycompany.com".
-      return ['#', '@', ',', '!', '?', '{', '}'];
+      var defaults = ['#', '@', ',', '!', '?', '{', '}'];
+
+      return this._map[this._active].cancel || defaults;
     },
 
     _getTerminators: function() {
       return [' ', ':', ',', '.', '!', '?'];
+    },
+
+    _getIgnoreList: function() {
+      return this._map[this._active].ignore || [];
     },
 
     _isTerminatedString: function(string) {
@@ -430,12 +440,31 @@ JX.install('PHUIXAutocomplete', {
         }
       }
 
+      // Deactivate if the user moves the cursor to the left of the assist
+      // range. For example, they might press the "left" arrow to move the
+      // cursor to the left, or click in the textarea prior to the active
+      // range.
+      var range = JX.TextAreaUtils.getSelectionRange(area);
+      if (range.start < this._cursorHead) {
+        this._deactivate();
+        return;
+      }
+
       if (special == 'tab' || special == 'return') {
         var r = e.getRawEvent();
         if (r.shiftKey && special == 'tab') {
           // Don't treat "Shift + Tab" as an autocomplete action. Instead,
           // let it through normally so the focus shifts to the previous
           // control.
+          this._deactivate();
+          return;
+        }
+
+        // If the user hasn't typed any text yet after typing the character
+        // which can summon the autocomplete, deactivate and let the keystroke
+        // through. For example, we hit this when a line ends with an
+        // autocomplete character and the user is trying to type a newline.
+        if (range.start == this._cursorHead) {
           this._deactivate();
           return;
         }
@@ -448,16 +477,6 @@ JX.install('PHUIXAutocomplete', {
         }
 
         e.kill();
-        return;
-      }
-
-      // Deactivate if the user moves the cursor to the left of the assist
-      // range. For example, they might press the "left" arrow to move the
-      // cursor to the left, or click in the textarea prior to the active
-      // range.
-      var range = JX.TextAreaUtils.getSelectionRange(area);
-      if (range.start < this._cursorHead) {
-        this._deactivate();
         return;
       }
 
@@ -487,8 +506,6 @@ JX.install('PHUIXAutocomplete', {
         this._cursorHead,
         this._cursorTail);
 
-      this._value = text;
-
       var pixels = JX.TextAreaUtils.getPixelDimensions(
         area,
         range.start,
@@ -504,15 +521,45 @@ JX.install('PHUIXAutocomplete', {
         return;
       }
 
-      var trim = this._trim(text);
-
       // Deactivate immediately if a user types a character that we are
       // reasonably sure means they don't want to use the autocomplete. For
       // example, "##" is almost certainly a header or monospaced text, not
       // a project autocompletion.
       var cancels = this._getCancelCharacters();
       for (var ii = 0; ii < cancels.length; ii++) {
-        if (trim.indexOf(cancels[ii]) !== -1) {
+        if (text.indexOf(cancels[ii]) !== -1) {
+          this._deactivate();
+          return;
+        }
+      }
+
+      var trim = this._trim(text);
+
+      // If this rule has a prefix pattern, like the "[[ document ]]" rule,
+      // require it match and throw it away before we begin suggesting
+      // results. The autocomplete remains active, it's just dormant until
+      // the user gives us more to work with.
+      var prefix = this._map[this._active].prefix;
+      if (prefix) {
+        var pattern = new RegExp(prefix);
+        if (!trim.match(pattern)) {
+          return;
+        }
+        trim = trim.replace(pattern, '');
+        trim = trim.trim();
+      }
+
+      // Store the current value now that we've finished mutating the text.
+      // This needs to match what we pass to the typeahead datasource.
+      this._value = trim;
+
+      // Deactivate immediately if the user types an ignored token like ":)",
+      // the smiley face emoticon. Note that we test against "text", not
+      // "trim", because the ignore list and suffix list can otherwise
+      // interact destructively.
+      var ignore = this._getIgnoreList();
+      for (ii = 0; ii < ignore.length; ii++) {
+        if (text.indexOf(ignore[ii]) === 0) {
           this._deactivate();
           return;
         }
@@ -520,7 +567,7 @@ JX.install('PHUIXAutocomplete', {
 
       // If the input is terminated by a space or another word-terminating
       // punctuation mark, we're going to deactivate if the results can not
-      // be refined by addding more words.
+      // be refined by adding more words.
 
       // The idea is that if you type "@alan ab", you're allowed to keep
       // editing "ab" until you type a space, period, or other terminator,

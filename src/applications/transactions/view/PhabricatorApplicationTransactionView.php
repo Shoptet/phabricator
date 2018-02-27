@@ -55,6 +55,10 @@ class PhabricatorApplicationTransactionView extends AphrontView {
     return $this;
   }
 
+  public function getIsPreview() {
+    return $this->isPreview;
+  }
+
   public function setShowEditActions($show_edit_actions) {
     $this->showEditActions = $show_edit_actions;
     return $this;
@@ -419,7 +423,8 @@ class PhabricatorApplicationTransactionView extends AphrontView {
       ->setUserHandle($xaction->getHandle($xaction->getAuthorPHID()))
       ->setIcon($xaction->getIcon())
       ->setColor($xaction->getColor())
-      ->setHideCommentOptions($this->getHideCommentOptions());
+      ->setHideCommentOptions($this->getHideCommentOptions())
+      ->setIsSilent($xaction->getIsSilentTransaction());
 
     list($token, $token_removed) = $xaction->getToken();
     if ($token) {

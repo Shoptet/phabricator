@@ -14,6 +14,7 @@ JX.install('PHUIXFormControl', {
     _className: null,
     _valueSetCallback: null,
     _valueGetCallback: null,
+    _rawInputNode: null,
 
     setLabel: function(label) {
       JX.DOM.setContent(this._getLabelNode(), label);
@@ -47,6 +48,18 @@ JX.install('PHUIXFormControl', {
         case 'optgroups':
           input = this._newOptgroups(spec);
           break;
+        case 'static':
+          input = this._newStatic(spec);
+          break;
+        case 'checkboxes':
+          input = this._newCheckboxes(spec);
+          break;
+        case 'text':
+          input = this._newText(spec);
+          break;
+        case 'remarkup':
+          input = this._newRemarkup(spec);
+          break;
         default:
           // TODO: Default or better error?
           JX.$E('Bad Input Type');
@@ -56,6 +69,7 @@ JX.install('PHUIXFormControl', {
       JX.DOM.setContent(node, input.node);
       this._valueGetCallback = input.get;
       this._valueSetCallback = input.set;
+      this._rawInputNode = input.node;
 
       return this;
     },
@@ -67,6 +81,10 @@ JX.install('PHUIXFormControl', {
 
     getValue: function() {
       return this._valueGetCallback();
+    },
+
+    getRawInputNode: function() {
+      return this._rawInputNode;
     },
 
     getNode: function() {
@@ -172,13 +190,141 @@ JX.install('PHUIXFormControl', {
       };
     },
 
+    _newStatic: function(spec) {
+      var node = JX.$N(
+        'div',
+        {
+          className: 'phui-form-static-action'
+        },
+        spec.description || '');
+
+      return {
+        node: node,
+        get: function() {
+          return true;
+        },
+        set: function() {
+          return;
+        }
+      };
+    },
+
+    _newCheckboxes: function(spec) {
+      var checkboxes = [];
+      var checkbox_list = [];
+      for (var ii = 0; ii < spec.keys.length; ii++) {
+        var key = spec.keys[ii];
+        var checkbox_id = 'checkbox-' + Math.floor(Math.random() * 1000000);
+
+        var checkbox = JX.$N(
+          'input',
+          {
+            type: 'checkbox',
+            value: key,
+            id: checkbox_id
+          });
+
+        checkboxes.push(checkbox);
+
+        var label = JX.$N(
+          'label',
+          {
+            className: 'phuix-form-checkbox-label',
+            htmlFor: checkbox_id
+          },
+          JX.$H(spec.labels[key] || ''));
+
+        var display = JX.$N(
+          'div',
+          {
+            className: 'phuix-form-checkbox-item'
+          },
+          [checkbox, label]);
+
+        checkbox_list.push(display);
+      }
+
+      var node = JX.$N(
+        'div',
+        {
+          className: 'phuix-form-checkbox-action'
+        },
+        checkbox_list);
+
+      var get_value = function() {
+        var list = [];
+        for (var ii = 0; ii < checkboxes.length; ii++) {
+          if (checkboxes[ii].checked) {
+            list.push(checkboxes[ii].value);
+          }
+        }
+        return list;
+      };
+
+      var set_value = function(value) {
+        value = value || [];
+
+        if (!value.length) {
+          value = [];
+        }
+
+        var map = {};
+        var ii;
+        for (ii = 0; ii < value.length; ii++) {
+          map[value[ii]] = true;
+        }
+
+        for (ii = 0; ii < checkboxes.length; ii++) {
+          if (map.hasOwnProperty(checkboxes[ii].value)) {
+            checkboxes[ii].checked = 'checked';
+          } else {
+            checkboxes[ii].checked = false;
+          }
+        }
+      };
+
+      set_value(spec.value);
+
+      return {
+        node: node,
+        get: get_value,
+        set: set_value
+      };
+    },
+
     _newPoints: function(spec) {
+      return this._newText(spec);
+    },
+
+    _newText: function(spec) {
       var attrs = {
         type: 'text',
         value: spec.value
       };
 
       var node = JX.$N('input', attrs);
+
+      return {
+        node: node,
+        get: function() {
+          return node.value;
+        },
+        set: function(value) {
+          node.value = value;
+        }
+      };
+    },
+
+    _newRemarkup: function(spec) {
+      var attrs = {};
+
+      // We could imagine a world where this renders a full remarkup control
+      // with all the hint buttons and client behaviors, but today much of that
+      // behavior is defined server-side and thus this isn't a world we
+      // currently live in.
+
+      var node = JX.$N('textarea', attrs);
+      node.value = spec.value || '';
 
       return {
         node: node,

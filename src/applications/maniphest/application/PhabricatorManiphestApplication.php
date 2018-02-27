@@ -6,6 +6,10 @@ final class PhabricatorManiphestApplication extends PhabricatorApplication {
     return pht('Maniphest');
   }
 
+  public function getMenuName() {
+    return pht('Tasks');
+  }
+
   public function getShortDescription() {
     return pht('Tasks and Bugs');
   }
@@ -46,48 +50,16 @@ final class PhabricatorManiphestApplication extends PhabricatorApplication {
     return array(
       '/T(?P<id>[1-9]\d*)' => 'ManiphestTaskDetailController',
       '/maniphest/' => array(
-        '(?:query/(?P<queryKey>[^/]+)/)?' => 'ManiphestTaskListController',
+        $this->getQueryRoutePattern() => 'ManiphestTaskListController',
         'report/(?:(?P<view>\w+)/)?' => 'ManiphestReportController',
-        'batch/' => 'ManiphestBatchEditController',
+        $this->getBulkRoutePattern('bulk/') => 'ManiphestBulkEditController',
         'task/' => array(
           $this->getEditRoutePattern('edit/')
             => 'ManiphestTaskEditController',
         ),
-        'export/(?P<key>[^/]+)/' => 'ManiphestExportController',
         'subpriority/' => 'ManiphestSubpriorityController',
       ),
     );
-  }
-
-  public function loadStatus(PhabricatorUser $user) {
-    $status = array();
-
-    if (!$user->isLoggedIn()) {
-      return $status;
-    }
-
-    $limit = self::MAX_STATUS_ITEMS;
-
-    $query = id(new ManiphestTaskQuery())
-      ->setViewer($user)
-      ->withStatuses(ManiphestTaskStatus::getOpenStatusConstants())
-      ->withOwners(array($user->getPHID()))
-      ->setLimit($limit);
-
-    $count = count($query->execute());
-    if ($count >= $limit) {
-      $count_str = pht('%s+ Assigned Task(s)', new PhutilNumber($limit - 1));
-    } else {
-      $count_str = pht('%s Assigned Task(s)', new PhutilNumber($count));
-    }
-
-    $type = PhabricatorApplicationStatusView::TYPE_WARNING;
-    $status[] = id(new PhabricatorApplicationStatusView())
-      ->setType($type)
-      ->setText($count_str)
-      ->setCount($count);
-
-    return $status;
   }
 
   public function supportsEmailIntegration() {

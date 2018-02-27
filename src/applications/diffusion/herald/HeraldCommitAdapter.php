@@ -104,12 +104,26 @@ final class HeraldCommitAdapter
   public function getTriggerObjectPHIDs() {
     $project_type = PhabricatorProjectObjectHasProjectEdgeType::EDGECONST;
 
-    return array_merge(
-      array(
-        $this->getRepository()->getPHID(),
-        $this->getPHID(),
-      ),
-      $this->loadEdgePHIDs($project_type));
+    $repository_phid = $this->getRepository()->getPHID();
+    $commit_phid = $this->getObject()->getPHID();
+
+    $phids = array();
+    $phids[] = $commit_phid;
+    $phids[] = $repository_phid;
+
+    // NOTE: This is projects for the repository, not for the commit. When
+    // Herald evaluates, commits normally can not have any project tags yet.
+    $repository_project_phids = PhabricatorEdgeQuery::loadDestinationPHIDs(
+      $repository_phid,
+      $project_type);
+    foreach ($repository_project_phids as $phid) {
+      $phids[] = $phid;
+    }
+
+    $phids = array_unique($phids);
+    $phids = array_values($phids);
+
+    return $phids;
   }
 
   public function explainValidTriggerObjects() {
@@ -121,13 +135,16 @@ final class HeraldCommitAdapter
   }
 
   public function loadAffectedPaths() {
+    $viewer = $this->getViewer();
+
     if ($this->affectedPaths === null) {
       $result = PhabricatorOwnerPathQuery::loadAffectedPaths(
         $this->getRepository(),
         $this->commit,
-        PhabricatorUser::getOmnipotentUser());
+        $viewer);
       $this->affectedPaths = $result;
     }
+
     return $this->affectedPaths;
   }
 
@@ -158,6 +175,8 @@ final class HeraldCommitAdapter
   }
 
   public function loadDifferentialRevision() {
+    $viewer = $this->getViewer();
+
     if ($this->affectedRevision === null) {
       $this->affectedRevision = false;
 
@@ -175,15 +194,15 @@ final class HeraldCommitAdapter
 
         $revision = id(new DifferentialRevisionQuery())
           ->withIDs(array($revision_id))
-          ->setViewer(PhabricatorUser::getOmnipotentUser())
-          ->needRelationships(true)
-          ->needReviewerStatus(true)
+          ->setViewer($viewer)
+          ->needReviewers(true)
           ->executeOne();
         if ($revision) {
           $this->affectedRevision = $revision;
         }
       }
     }
+
     return $this->affectedRevision;
   }
 
@@ -196,7 +215,7 @@ final class HeraldCommitAdapter
   }
 
   private function loadCommitDiff() {
-    $viewer = PhabricatorUser::getOmnipotentUser();
+    $viewer = $this->getViewer();
 
     $byte_limit = self::getEnormousByteLimit();
     $time_limit = self::getEnormousTimeLimit();
@@ -310,7 +329,7 @@ final class HeraldCommitAdapter
   }
 
   private function callConduit($method, array $params) {
-    $viewer = PhabricatorUser::getOmnipotentUser();
+    $viewer = $this->getViewer();
 
     $drequest = DiffusionRequest::newFromDictionary(
       array(

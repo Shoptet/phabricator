@@ -309,6 +309,8 @@ final class NuanceGitHubEventItemType
         'a',
         array(
           'href' => $event_uri,
+          'target' => '_blank',
+          'rel' => 'noreferrer',
         ),
         $event_uri);
     }
@@ -328,6 +330,9 @@ final class NuanceGitHubEventItemType
   protected function handleCommand(
     NuanceItem $item,
     NuanceItemCommand $command) {
+
+    // TODO: This code is no longer reachable, and has moved to
+    // CommandImplementation subclasses.
 
     $action = $command->getCommand();
     switch ($action) {
@@ -390,12 +395,14 @@ final class NuanceGitHubEventItemType
       $state = $xobj->getProperty('task.state');
 
       $xactions[] = id(new ManiphestTransaction())
-        ->setTransactionType(ManiphestTransaction::TYPE_TITLE)
+        ->setTransactionType(
+          ManiphestTaskTitleTransaction::TRANSACTIONTYPE)
         ->setNewValue($title)
         ->setDateCreated($created);
 
       $xactions[] = id(new ManiphestTransaction())
-        ->setTransactionType(ManiphestTransaction::TYPE_DESCRIPTION)
+        ->setTransactionType(
+          ManiphestTaskDescriptionTransaction::TRANSACTIONTYPE)
         ->setNewValue($description)
         ->setDateCreated($created);
 

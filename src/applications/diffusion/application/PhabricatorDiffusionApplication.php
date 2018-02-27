@@ -6,6 +6,10 @@ final class PhabricatorDiffusionApplication extends PhabricatorApplication {
     return pht('Diffusion');
   }
 
+  public function getMenuName() {
+    return pht('Repositories');
+  }
+
   public function getShortDescription() {
     return pht('Host and Browse Repositories');
   }
@@ -28,12 +32,10 @@ final class PhabricatorDiffusionApplication extends PhabricatorApplication {
         'name' => pht('Diffusion User Guide'),
         'href' => PhabricatorEnv::getDoclink('Diffusion User Guide'),
       ),
-    );
-  }
-
-  public function getFactObjectsForAnalysis() {
-    return array(
-      new PhabricatorRepositoryCommit(),
+      array(
+        'name' => pht('Audit User Guide'),
+        'href' => PhabricatorEnv::getDoclink('Audit User Guide'),
+      ),
     );
   }
 
@@ -51,7 +53,9 @@ final class PhabricatorDiffusionApplication extends PhabricatorApplication {
         '' => 'DiffusionRepositoryController',
         'repository/(?P<dblob>.*)' => 'DiffusionRepositoryController',
         'change/(?P<dblob>.*)' => 'DiffusionChangeController',
+        'clone/' => 'DiffusionCloneController',
         'history/(?P<dblob>.*)' => 'DiffusionHistoryController',
+        'graph/(?P<dblob>.*)' => 'DiffusionGraphController',
         'browse/(?P<dblob>.*)' => 'DiffusionBrowseController',
         'lastmodified/(?P<dblob>.*)' => 'DiffusionLastModifiedController',
         'diff/' => 'DiffusionDiffController',
@@ -59,12 +63,11 @@ final class PhabricatorDiffusionApplication extends PhabricatorApplication {
         'branches/(?P<dblob>.*)' => 'DiffusionBranchTableController',
         'refs/(?P<dblob>.*)' => 'DiffusionRefTableController',
         'lint/(?P<dblob>.*)' => 'DiffusionLintController',
-        'commit/(?P<commit>[a-z0-9]+)/branches/'
-          => 'DiffusionCommitBranchesController',
-        'commit/(?P<commit>[a-z0-9]+)/tags/'
-          => 'DiffusionCommitTagsController',
-        'commit/(?P<commit>[a-z0-9]+)/edit/'
-          => 'DiffusionCommitEditController',
+        'commit/(?P<commit>[a-z0-9]+)' => array(
+          '/?' => 'DiffusionCommitController',
+          '/branches/' => 'DiffusionCommitBranchesController',
+          '/tags/' => 'DiffusionCommitTagsController',
+        ),
         'compare/' => 'DiffusionCompareController',
         'manage/(?:(?P<panel>[^/]+)/)?'
           => 'DiffusionRepositoryManagePanelsController',
@@ -80,6 +83,7 @@ final class PhabricatorDiffusionApplication extends PhabricatorApplication {
         'edit/' => array(
           'activate/' => 'DiffusionRepositoryEditActivateController',
           'dangerous/' => 'DiffusionRepositoryEditDangerousController',
+          'enormous/' => 'DiffusionRepositoryEditEnormousController',
           'delete/' => 'DiffusionRepositoryEditDeleteController',
           'update/' => 'DiffusionRepositoryEditUpdateController',
           'testautomation/' => 'DiffusionRepositoryTestAutomationController',
@@ -111,8 +115,11 @@ final class PhabricatorDiffusionApplication extends PhabricatorApplication {
         $this->getEditRoutePattern('edit/') =>
           'DiffusionRepositoryEditController',
         'pushlog/' => array(
-          '(?:query/(?P<queryKey>[^/]+)/)?' => 'DiffusionPushLogListController',
+          $this->getQueryRoutePattern() => 'DiffusionPushLogListController',
           'view/(?P<id>\d+)/' => 'DiffusionPushEventViewController',
+        ),
+        'pulllog/' => array(
+          $this->getQueryRoutePattern() => 'DiffusionPullLogListController',
         ),
         '(?P<repositoryCallsign>[A-Z]+)' => $repository_routes,
         '(?P<repositoryID>[1-9]\d*)' => $repository_routes,
@@ -131,6 +138,15 @@ final class PhabricatorDiffusionApplication extends PhabricatorApplication {
         'symbol/(?P<name>[^/]+)/' => 'DiffusionSymbolController',
         'external/' => 'DiffusionExternalController',
         'lint/' => 'DiffusionLintController',
+
+        'commit/' => array(
+          $this->getQueryRoutePattern() =>
+            'DiffusionCommitListController',
+          $this->getEditRoutePattern('edit/') =>
+            'DiffusionCommitEditController',
+        ),
+        'picture/(?P<id>[0-9]\d*)/'
+          => 'DiffusionRepositoryProfilePictureController',
       ),
     );
   }

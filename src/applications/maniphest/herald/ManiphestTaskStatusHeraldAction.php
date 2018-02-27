@@ -40,7 +40,7 @@ final class ManiphestTaskStatusHeraldAction
     }
 
     $xaction = $adapter->newTransaction()
-      ->setTransactionType(ManiphestTransaction::TYPE_STATUS)
+      ->setTransactionType(ManiphestTaskStatusTransaction::TRANSACTIONTYPE)
       ->setNewValue($status);
 
     $adapter->queueTransaction($xaction);
@@ -58,7 +58,8 @@ final class ManiphestTaskStatusHeraldAction
   }
 
   protected function getDatasource() {
-    return new ManiphestTaskStatusDatasource();
+    return id(new ManiphestTaskStatusDatasource())
+      ->setLimit(1);
   }
 
   protected function getDatasourceValueMap() {

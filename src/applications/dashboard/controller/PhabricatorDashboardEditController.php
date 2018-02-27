@@ -117,7 +117,7 @@ final class PhabricatorDashboardEditController
           ->setContentSourceFromRequest($request)
           ->applyTransactions($dashboard, $xactions);
 
-        $uri = $this->getApplicationURI('manage/'.$dashboard->getID().'/');
+        $uri = $this->getApplicationURI('arrange/'.$dashboard->getID().'/');
 
         return id(new AphrontRedirectResponse())->setURI($uri);
       } catch (PhabricatorApplicationTransactionValidationException $ex) {
@@ -184,19 +184,14 @@ final class PhabricatorDashboardEditController
           ->addCancelButton($cancel_uri));
 
     $box = id(new PHUIObjectBoxView())
-      ->setHeaderText(pht('Dashboard'))
+      ->setHeaderText($title)
       ->setForm($form)
-      ->setBackground(PHUIObjectBoxView::BLUE_PROPERTY)
+      ->setBackground(PHUIObjectBoxView::WHITE_CONFIG)
       ->setValidationException($validation_exception);
 
     $crumbs->setBorder(true);
 
-    $header = id(new PHUIHeaderView())
-      ->setHeader($title)
-      ->setHeaderIcon($header_icon);
-
     $view = id(new PHUITwoColumnView())
-      ->setHeader($header)
       ->setFooter($box);
 
     return $this->newPage()
@@ -245,7 +240,7 @@ final class PhabricatorDashboardEditController
 
     switch ($template) {
       case 'simple':
-        $v_name = pht('New Simple Dashboard');
+        $v_name = pht("%s's Dashboard", $viewer->getUsername());
 
         $welcome_panel = $this->newPanel(
           $request,
@@ -260,8 +255,9 @@ final class PhabricatorDashboardEditController
               "rustic, authentic feel.\n\n".
               "You can drag, remove, add, and edit panels to customize the ".
               "rest of this dashboard to show the information you want.\n\n".
-              "To install this dashboard on the home page, use the ".
-              "**Install Dashboard** action link above."),
+              "To install this dashboard on the home page, edit your personal ".
+              "or global menu on the homepage and click Dashboard under ".
+              "New Menu Item on the right."),
           ));
         $panel_phids[] = $welcome_panel->getPHID();
 
@@ -276,14 +272,25 @@ final class PhabricatorDashboardEditController
           ));
         $panel_phids[] = $feed_panel->getPHID();
 
+        $revision_panel = $this->newPanel(
+          $request,
+          $viewer,
+          'query',
+          pht('Active Revisions'),
+          array(
+            'class' => 'DifferentialRevisionSearchEngine',
+            'key' => 'active',
+          ));
+        $panel_phids[] = $revision_panel->getPHID();
+
         $task_panel = $this->newPanel(
           $request,
           $viewer,
           'query',
-          pht('Open Tasks'),
+          pht('Assigned Tasks'),
           array(
             'class' => 'ManiphestTaskSearchEngine',
-            'key' => 'open',
+            'key' => 'assigned',
           ));
         $panel_phids[] = $task_panel->getPHID();
 
@@ -302,6 +309,7 @@ final class PhabricatorDashboardEditController
         $layout = id(new PhabricatorDashboardLayoutConfig())
           ->setLayoutMode($mode_2_and_1)
           ->setPanelLocation(0, $welcome_panel->getPHID())
+          ->setPanelLocation(0, $revision_panel->getPHID())
           ->setPanelLocation(0, $task_panel->getPHID())
           ->setPanelLocation(0, $commit_panel->getPHID())
           ->setPanelLocation(1, $feed_panel->getPHID());
@@ -338,7 +346,7 @@ final class PhabricatorDashboardEditController
       ->setContentSourceFromRequest($request)
       ->applyTransactions($dashboard, $xactions);
 
-    $manage_uri = $this->getApplicationURI('manage/'.$dashboard->getID().'/');
+    $manage_uri = $this->getApplicationURI('arrange/'.$dashboard->getID().'/');
 
     return id(new AphrontRedirectResponse())
       ->setURI($manage_uri);

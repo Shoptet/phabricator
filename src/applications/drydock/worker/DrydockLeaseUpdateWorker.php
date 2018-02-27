@@ -43,6 +43,27 @@ final class DrydockLeaseUpdateWorker extends DrydockWorker {
   private function handleUpdate(DrydockLease $lease) {
     try {
       $this->updateLease($lease);
+    } catch (DrydockAcquiredBrokenResourceException $ex) {
+      // If this lease acquired a resource but failed to activate, we don't
+      // need to break the lease. We can throw it back in the pool and let
+      // it take another shot at acquiring a new resource.
+
+      // Before we throw it back, release any locks the lease is holding.
+      DrydockSlotLock::releaseLocks($lease->getPHID());
+
+      $lease
+        ->setStatus(DrydockLeaseStatus::STATUS_PENDING)
+        ->setResourcePHID(null)
+        ->save();
+
+      $lease->logEvent(
+        DrydockLeaseReacquireLogType::LOGCONST,
+        array(
+          'class' => get_class($ex),
+          'message' => $ex->getMessage(),
+        ));
+
+      $this->yieldLease($lease, $ex);
     } catch (Exception $ex) {
       if ($this->isTemporaryException($ex)) {
         $this->yieldLease($lease, $ex);
@@ -216,17 +237,51 @@ final class DrydockLeaseUpdateWorker extends DrydockWorker {
           // this.
           break;
         } catch (Exception $ex) {
+          // This failure is not normally expected, so log it. It can be
+          // caused by something mundane and recoverable, however (see below
+          // for discussion).
+
+          // We log to the blueprint separately from the log to the lease:
+          // the lease is not attached to a blueprint yet so the lease log
+          // will not show up on the blueprint; more than one blueprint may
+          // fail; and the lease is not really impacted (and won't log) if at
+          // least one blueprint actually works.
+
+          $blueprint->logEvent(
+            DrydockResourceAllocationFailureLogType::LOGCONST,
+            array(
+              'class' => get_class($ex),
+              'message' => $ex->getMessage(),
+            ));
+
           $exceptions[] = $ex;
         }
       }
 
       if (!$resources) {
-        throw new PhutilAggregateException(
+        // If one or more blueprints claimed that they would be able to
+        // allocate resources but none are actually able to allocate resources,
+        // log the failure and yield so we try again soon.
+
+        // This can happen if some unexpected issue occurs during allocation
+        // (for example, a call to build a VM fails for some reason) or if we
+        // raced another allocator and the blueprint is now full.
+
+        $ex = new PhutilAggregateException(
           pht(
             'All blueprints failed to allocate a suitable new resource when '.
-            'trying to allocate lease "%s".',
+            'trying to allocate lease ("%s").',
             $lease->getPHID()),
           $exceptions);
+
+        $lease->logEvent(
+          DrydockLeaseAllocationFailureLogType::LOGCONST,
+          array(
+            'class' => get_class($ex),
+            'message' => $ex->getMessage(),
+          ));
+
+        throw new PhabricatorWorkerYieldException(15);
       }
 
       $resources = $this->removeUnacquirableResources($resources, $lease);
@@ -241,29 +296,44 @@ final class DrydockLeaseUpdateWorker extends DrydockWorker {
       // NOTE: We have not acquired the lease yet, so it is possible that the
       // resource we just built will be snatched up by some other lease before
       // we can acquire it. This is not problematic: we'll retry a little later
-      // and should suceed eventually.
+      // and should succeed eventually.
     }
 
     $resources = $this->rankResources($resources, $lease);
 
     $exceptions = array();
+    $yields = array();
     $allocated = false;
     foreach ($resources as $resource) {
       try {
         $this->acquireLease($resource, $lease);
         $allocated = true;
         break;
+      } catch (DrydockResourceLockException $ex) {
+        // We need to lock the resource to actually acquire it. If we aren't
+        // able to acquire the lock quickly enough, we can yield and try again
+        // later.
+        $yields[] = $ex;
+      } catch (DrydockAcquiredBrokenResourceException $ex) {
+        // If a resource was reclaimed or destroyed by the time we actually
+        // got around to acquiring it, we just got unlucky. We can yield and
+        // try again later.
+        $yields[] = $ex;
       } catch (Exception $ex) {
         $exceptions[] = $ex;
       }
     }
 
     if (!$allocated) {
-      throw new PhutilAggregateException(
-        pht(
-          'Unable to acquire lease "%s" on any resouce.',
-          $lease->getPHID()),
-        $exceptions);
+      if ($yields) {
+        throw new PhabricatorWorkerYieldException(15);
+      } else {
+        throw new PhutilAggregateException(
+          pht(
+            'Unable to acquire lease "%s" on any resource.',
+            $lease->getPHID()),
+          $exceptions);
+      }
     }
   }
 
@@ -715,9 +785,12 @@ final class DrydockLeaseUpdateWorker extends DrydockWorker {
     }
 
     if ($resource_status != DrydockResourceStatus::STATUS_ACTIVE) {
-      throw new Exception(
+      throw new DrydockAcquiredBrokenResourceException(
         pht(
-          'Trying to activate lease on a dead resource (in status "%s").',
+          'Trying to activate lease ("%s") on a resource ("%s") in '.
+          'the wrong status ("%s").',
+          $lease->getPHID(),
+          $resource->getPHID(),
           $resource_status));
     }
 
@@ -725,7 +798,7 @@ final class DrydockLeaseUpdateWorker extends DrydockWorker {
     // performed the read above and now, the resource might have closed, so
     // we may activate leases on dead resources. At least for now, this seems
     // fine: a resource dying right before we activate a lease on it should not
-    // be distinguisahble from a resource dying right after we activate a lease
+    // be distinguishable from a resource dying right after we activate a lease
     // on it. We end up with an active lease on a dead resource either way, and
     // can not prevent resources dying from lightning strikes.
 

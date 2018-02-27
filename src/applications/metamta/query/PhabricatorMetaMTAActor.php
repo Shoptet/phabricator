@@ -20,12 +20,15 @@ final class PhabricatorMetaMTAActor extends Phobject {
   const REASON_FORCE_HERALD = 'force-herald';
   const REASON_ROUTE_AS_NOTIFICATION = 'route-as-notification';
   const REASON_ROUTE_AS_MAIL = 'route-as-mail';
+  const REASON_UNVERIFIED = 'unverified';
+  const REASON_MUTED = 'muted';
 
   private $phid;
   private $emailAddress;
   private $name;
   private $status = self::STATUS_DELIVERABLE;
   private $reasons = array();
+  private $isVerified = false;
 
   public function setName($name) {
     $this->name = $name;
@@ -43,6 +46,15 @@ final class PhabricatorMetaMTAActor extends Phobject {
 
   public function getEmailAddress() {
     return $this->emailAddress;
+  }
+
+  public function setIsVerified($is_verified) {
+    $this->isVerified = $is_verified;
+    return $this;
+  }
+
+  public function getIsVerified() {
+    return $this->isVerified;
   }
 
   public function setPHID($phid) {
@@ -104,6 +116,8 @@ final class PhabricatorMetaMTAActor extends Phobject {
       self::REASON_FORCE_HERALD => pht('Forced by Herald'),
       self::REASON_ROUTE_AS_NOTIFICATION => pht('Route as Notification'),
       self::REASON_ROUTE_AS_MAIL => pht('Route as Mail'),
+      self::REASON_UNVERIFIED => pht('Address Not Verified'),
+      self::REASON_MUTED => pht('Muted'),
     );
 
     return idx($names, $reason, pht('Unknown ("%s")', $reason));
@@ -158,6 +172,10 @@ final class PhabricatorMetaMTAActor extends Phobject {
       self::REASON_ROUTE_AS_MAIL => pht(
         'This message was upgraded to email by outbound mail rules '.
         'in Herald.'),
+      self::REASON_UNVERIFIED => pht(
+        'This recipient does not have a verified primary email address.'),
+      self::REASON_MUTED => pht(
+        'This recipient has muted notifications for this object.'),
     );
 
     return idx($descriptions, $reason, pht('Unknown Reason ("%s")', $reason));

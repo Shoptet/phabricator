@@ -4,6 +4,7 @@ final class PhabricatorSubscriptionsEditEngineExtension
   extends PhabricatorEditEngineExtension {
 
   const EXTENSIONKEY = 'subscriptions.subscribers';
+  const FIELDKEY = 'subscriberPHIDs';
 
   const EDITKEY_ADD = 'subscribers.add';
   const EDITKEY_SET = 'subscribers.set';
@@ -41,8 +42,10 @@ final class PhabricatorSubscriptionsEditEngineExtension
       $sub_phids = array();
     }
 
+    $viewer = $engine->getViewer();
+
     $subscribers_field = id(new PhabricatorSubscribersEditField())
-      ->setKey('subscriberPHIDs')
+      ->setKey(self::FIELDKEY)
       ->setLabel(pht('Subscribers'))
       ->setEditTypeKey('subscribers')
       ->setAliases(array('subscriber', 'subscribers'))
@@ -52,9 +55,11 @@ final class PhabricatorSubscriptionsEditEngineExtension
       ->setCommentActionOrder(9000)
       ->setDescription(pht('Choose subscribers.'))
       ->setTransactionType($subscribers_type)
-      ->setValue($sub_phids);
+      ->setValue($sub_phids)
+      ->setViewer($viewer);
 
-    $subscribers_field->setViewer($engine->getViewer());
+    $subscriber_datasource = id(new PhabricatorMetaMTAMailableDatasource())
+      ->setViewer($viewer);
 
     $edit_add = $subscribers_field->getConduitEditType(self::EDITKEY_ADD)
       ->setConduitDescription(pht('Add subscribers.'));
@@ -65,6 +70,18 @@ final class PhabricatorSubscriptionsEditEngineExtension
 
     $edit_rem = $subscribers_field->getConduitEditType(self::EDITKEY_REMOVE)
       ->setConduitDescription(pht('Remove subscribers.'));
+
+    $subscribers_field->getBulkEditType(self::EDITKEY_ADD)
+      ->setBulkEditLabel(pht('Add subscribers'))
+      ->setDatasource($subscriber_datasource);
+
+    $subscribers_field->getBulkEditType(self::EDITKEY_SET)
+      ->setBulkEditLabel(pht('Set subscribers to'))
+      ->setDatasource($subscriber_datasource);
+
+    $subscribers_field->getBulkEditType(self::EDITKEY_REMOVE)
+      ->setBulkEditLabel(pht('Remove subscribers'))
+      ->setDatasource($subscriber_datasource);
 
     return array(
       $subscribers_field,

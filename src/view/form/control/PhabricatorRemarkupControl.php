@@ -1,9 +1,11 @@
 <?php
 
 final class PhabricatorRemarkupControl extends AphrontFormTextAreaControl {
-  private $disableMacro = false;
 
+  private $disableMacro = false;
   private $disableFullScreen = false;
+  private $canPin;
+  private $sendOnEnter = false;
 
   public function setDisableMacros($disable) {
     $this->disableMacro = $disable;
@@ -13,6 +15,24 @@ final class PhabricatorRemarkupControl extends AphrontFormTextAreaControl {
   public function setDisableFullScreen($disable) {
     $this->disableFullScreen = $disable;
     return $this;
+  }
+
+  public function setCanPin($can_pin) {
+    $this->canPin = $can_pin;
+    return $this;
+  }
+
+  public function getCanPin() {
+    return $this->canPin;
+  }
+
+  public function setSendOnEnter($soe) {
+    $this->sendOnEnter = $soe;
+    return $this;
+  }
+
+  public function getSendOnEnter() {
+    return $this->sendOnEnter;
   }
 
   protected function renderInput() {
@@ -45,11 +65,15 @@ final class PhabricatorRemarkupControl extends AphrontFormTextAreaControl {
     $root_id = celerity_generate_unique_node_id();
 
     $user_datasource = new PhabricatorPeopleDatasource();
+    $emoji_datasource = new PhabricatorEmojiDatasource();
     $proj_datasource = id(new PhabricatorProjectDatasource())
       ->setParameters(
         array(
           'autocomplete' => 1,
         ));
+
+    $phriction_datasource = new PhrictionDocumentDatasource();
+    $phurl_datasource = new PhabricatorPhurlURLDatasource();
 
     Javelin::initBehavior(
       'phabricator-remarkup-assist',
@@ -63,8 +87,11 @@ final class PhabricatorRemarkupControl extends AphrontFormTextAreaControl {
           'data' => pht('data'),
           'name' => pht('name'),
           'URL' => pht('URL'),
+          'key-help' => pht('Pin or unpin the comment form.'),
         ),
+        'canPin' => $this->getCanPin(),
         'disabled' => $this->getDisabled(),
+        'sendOnEnter' => $this->getSendOnEnter(),
         'rootID' => $root_id,
         'autocompleteMap' => (object)array(
           64 => array( // "@"
@@ -78,6 +105,43 @@ final class PhabricatorRemarkupControl extends AphrontFormTextAreaControl {
             'headerIcon' => 'fa-briefcase',
             'headerText' => pht('Find Project:'),
             'hintText' => $proj_datasource->getPlaceholderText(),
+          ),
+          58 => array( // ":"
+            'datasourceURI' => $emoji_datasource->getDatasourceURI(),
+            'headerIcon' => 'fa-smile-o',
+            'headerText' => pht('Find Emoji:'),
+            'hintText' => $emoji_datasource->getPlaceholderText(),
+
+            // Cancel on emoticons like ":3".
+            'ignore' => array(
+              '3',
+              ')',
+              '(',
+              '-',
+              '/',
+            ),
+          ),
+          91 => array( // "["
+            'datasourceURI' => $phriction_datasource->getDatasourceURI(),
+            'headerIcon' => 'fa-book',
+            'headerText' => pht('Find Document:'),
+            'hintText' => $phriction_datasource->getPlaceholderText(),
+            'cancel' => array(
+              ':', // Cancel on "http:" and similar.
+              '|',
+              ']',
+            ),
+            'prefix' => '^\\[',
+          ),
+          40 => array( // "("
+            'datasourceURI' => $phurl_datasource->getDatasourceURI(),
+            'headerIcon' => 'fa-compress',
+            'headerText' => pht('Find Phurl:'),
+            'hintText' => $phurl_datasource->getPlaceholderText(),
+            'cancel' => array(
+              ')',
+            ),
+            'prefix' => '^\\(',
           ),
         ),
       ));
@@ -153,28 +217,30 @@ final class PhabricatorRemarkupControl extends AphrontFormTextAreaControl {
       'align' => 'right',
     );
 
-    $actions[] = array(
-      'spacer' => true,
-      'align' => 'right',
-    );
-
     $actions['fa-book'] = array(
       'tip' => pht('Help'),
       'align' => 'right',
       'href'  => PhabricatorEnv::getDoclink('Remarkup Reference'),
     );
 
+    $mode_actions = array();
 
     if (!$this->disableFullScreen) {
-      $actions[] = array(
-        'spacer' => true,
-        'align' => 'right',
-      );
-
-      $actions['fa-arrows-alt'] = array(
+      $mode_actions['fa-arrows-alt'] = array(
         'tip' => pht('Fullscreen Mode'),
         'align' => 'right',
       );
+    }
+
+    if ($this->getCanPin()) {
+      $mode_actions['fa-thumb-tack'] = array(
+        'tip' => pht('Pin Form On Screen'),
+        'align' => 'right',
+      );
+    }
+
+    if ($mode_actions) {
+      $actions += $mode_actions;
     }
 
     $buttons = array();

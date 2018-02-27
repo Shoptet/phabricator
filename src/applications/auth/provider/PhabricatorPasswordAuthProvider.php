@@ -100,7 +100,7 @@ final class PhabricatorPasswordAuthProvider extends PhabricatorAuthProvider {
 
   public function getDescriptionForCreate() {
     return pht(
-      'Allow users to login or register using a username and password.');
+      'Allow users to log in or register using a username and password.');
   }
 
   public function getAdapter() {
@@ -174,8 +174,8 @@ final class PhabricatorPasswordAuthProvider extends PhabricatorAuthProvider {
     $dialog = id(new AphrontDialogView())
       ->setSubmitURI($this->getLoginURI())
       ->setUser($viewer)
-      ->setTitle(pht('Login to Phabricator'))
-      ->addSubmitButton(pht('Login'));
+      ->setTitle(pht('Log In'))
+      ->addSubmitButton(pht('Log In'));
 
     if ($this->shouldAllowRegistration()) {
       $dialog->addCancelButton(
@@ -253,6 +253,7 @@ final class PhabricatorPasswordAuthProvider extends PhabricatorAuthProvider {
 
     $request = $controller->getRequest();
     $viewer = $request->getUser();
+    $content_source = PhabricatorContentSource::newFromRequest($request);
 
     $require_captcha = false;
     $captcha_valid = false;
@@ -285,22 +286,16 @@ final class PhabricatorPasswordAuthProvider extends PhabricatorAuthProvider {
 
           if ($user) {
             $envelope = new PhutilOpaqueEnvelope($request->getStr('password'));
-            if ($user->comparePassword($envelope)) {
+
+            $engine = id(new PhabricatorAuthPasswordEngine())
+              ->setViewer($user)
+              ->setContentSource($content_source)
+              ->setPasswordType(PhabricatorAuthPassword::PASSWORD_TYPE_ACCOUNT)
+              ->setObject($user);
+
+            if ($engine->isValidPassword($envelope)) {
               $account = $this->loadOrCreateAccount($user->getPHID());
               $log_user = $user;
-
-              // If the user's password is stored using a less-than-optimal
-              // hash, upgrade them to the strongest available hash.
-
-              $hash_envelope = new PhutilOpaqueEnvelope(
-                $user->getPasswordHash());
-              if (PhabricatorPasswordHasher::canUpgradeHash($hash_envelope)) {
-                $user->setPassword($envelope);
-
-                $unguarded = AphrontWriteGuard::beginScopedUnguardedWrites();
-                  $user->save();
-                unset($unguarded);
-              }
             }
           }
         }

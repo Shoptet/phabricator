@@ -676,73 +676,73 @@ final class PhabricatorUSEnglishTranslation
       '%s edited commit(s), added %s: %s; removed %s: %s.' =>
         '%s edited commits, added %3$s; removed %5$s.',
 
-      '%s added %s reverted commit(s): %s.' => array(
+      '%s added %s reverted change(s): %s.' => array(
         array(
-          '%s added a reverted commit: %3$s.',
-          '%s added reverted commits: %3$s.',
+          '%s added a reverted change: %3$s.',
+          '%s added reverted changes: %3$s.',
         ),
       ),
 
-      '%s removed %s reverted commit(s): %s.' => array(
+      '%s removed %s reverted change(s): %s.' => array(
         array(
-          '%s removed a reverted commit: %3$s.',
-          '%s removed reverted commits: %3$s.',
+          '%s removed a reverted change: %3$s.',
+          '%s removed reverted changes: %3$s.',
         ),
       ),
 
-      '%s edited reverted commit(s), added %s: %s; removed %s: %s.' =>
-        '%s edited reverted commits, added %3$s; removed %5$s.',
+      '%s edited reverted change(s), added %s: %s; removed %s: %s.' =>
+        '%s edited reverted changes, added %3$s; removed %5$s.',
 
-      '%s added %s reverted commit(s) for %s: %s.' => array(
+      '%s added %s reverted change(s) for %s: %s.' => array(
         array(
-          '%s added a reverted commit for %3$s: %4$s.',
-          '%s added reverted commits for %3$s: %4$s.',
+          '%s added a reverted change for %3$s: %4$s.',
+          '%s added reverted changes for %3$s: %4$s.',
         ),
       ),
 
-      '%s removed %s reverted commit(s) for %s: %s.' => array(
+      '%s removed %s reverted change(s) for %s: %s.' => array(
         array(
-          '%s removed a reverted commit for %3$s: %4$s.',
-          '%s removed reverted commits for %3$s: %4$s.',
+          '%s removed a reverted change for %3$s: %4$s.',
+          '%s removed reverted changes for %3$s: %4$s.',
         ),
       ),
 
-      '%s edited reverted commit(s) for %s, added %s: %s; removed %s: %s.' =>
-        '%s edited reverted commits for %2$s, added %4$s; removed %6$s.',
+      '%s edited reverted change(s) for %s, added %s: %s; removed %s: %s.' =>
+        '%s edited reverted changes for %2$s, added %4$s; removed %6$s.',
 
-      '%s added %s reverting commit(s): %s.' => array(
+      '%s added %s reverting change(s): %s.' => array(
         array(
-          '%s added a reverting commit: %3$s.',
-          '%s added reverting commits: %3$s.',
+          '%s added a reverting change: %3$s.',
+          '%s added reverting changes: %3$s.',
         ),
       ),
 
-      '%s removed %s reverting commit(s): %s.' => array(
+      '%s removed %s reverting change(s): %s.' => array(
         array(
-          '%s removed a reverting commit: %3$s.',
-          '%s removed reverting commits: %3$s.',
+          '%s removed a reverting change: %3$s.',
+          '%s removed reverting changes: %3$s.',
         ),
       ),
 
-      '%s edited reverting commit(s), added %s: %s; removed %s: %s.' =>
-        '%s edited reverting commits, added %3$s; removed %5$s.',
+      '%s edited reverting change(s), added %s: %s; removed %s: %s.' =>
+        '%s edited reverting changes, added %3$s; removed %5$s.',
 
-      '%s added %s reverting commit(s) for %s: %s.' => array(
+      '%s added %s reverting change(s) for %s: %s.' => array(
         array(
-          '%s added a reverting commit for %3$s: %4$s.',
-          '%s added reverting commitsi for %3$s: %4$s.',
+          '%s added a reverting change for %3$s: %4$s.',
+          '%s added reverting changes for %3$s: %4$s.',
         ),
       ),
 
-      '%s removed %s reverting commit(s) for %s: %s.' => array(
+      '%s removed %s reverting change(s) for %s: %s.' => array(
         array(
-          '%s removed a reverting commit for %3$s: %4$s.',
-          '%s removed reverting commits for %3$s: %4$s.',
+          '%s removed a reverting change for %3$s: %4$s.',
+          '%s removed reverting changes for %3$s: %4$s.',
         ),
       ),
 
-      '%s edited reverting commit(s) for %s, added %s: %s; removed %s: %s.' =>
-        '%s edited reverting commits for %s, added %4$s; removed %6$s.',
+      '%s edited reverting change(s) for %s, added %s: %s; removed %s: %s.' =>
+        '%s edited reverting changes for %s, added %4$s; removed %6$s.',
 
       '%s changed project member(s), added %d: %s; removed %d: %s.' =>
         '%s changed project members, added %3$s; removed %5$s.',
@@ -1564,7 +1564,7 @@ final class PhabricatorUSEnglishTranslation
       '%s uninvited %s attendee(s): %s.' =>
         '%s uninvited: %3$s.',
 
-      '%s invited %s attendee(s): %s; uninvinted %s attendee(s): %s.' =>
+      '%s invited %s attendee(s): %s; uninvited %s attendee(s): %s.' =>
         '%s invited: %3$s; uninvited: %5$s.',
 
       '%s invited %s attendee(s) to %s: %s.' =>
@@ -1573,7 +1573,7 @@ final class PhabricatorUSEnglishTranslation
       '%s uninvited %s attendee(s) to %s: %s.' =>
         '%s removed invites for %3$s: %4$s.',
 
-      '%s updated the invite list for %s, invited %s: %s; uninvinted %s: %s.' =>
+      '%s updated the invite list for %s, invited %s: %s; uninvited %s: %s.' =>
         '%s updated the invite list for %s, invited: %4$s; uninvited: %6$s.',
 
       'Restart %s build(s)?' => array(
@@ -1586,6 +1586,69 @@ final class PhabricatorUSEnglishTranslation
           '%s is starting in one minute, at %3$s.',
           '%s is starting in %s minutes, at %s.',
         ),
+      ),
+
+      '%s added %s auditor(s): %s.' => array(
+        array(
+          '%s added an auditor: %3$s.',
+          '%s added auditors: %3$s.',
+        ),
+      ),
+
+      '%s removed %s auditor(s): %s.' => array(
+        array(
+          '%s removed an auditor: %3$s.',
+          '%s removed auditors: %3$s.',
+        ),
+      ),
+
+      '%s edited %s auditor(s), removed %s: %s; added %s: %s.' => array(
+        array(
+          '%s edited auditors, removed: %4$s; added: %6$s.',
+        ),
+      ),
+
+      '%s accepted this revision as %s reviewer(s): %s.' =>
+        '%s accepted this revision as: %3$s.',
+
+      '%s added %s merchant manager(s): %s.' => array(
+        array(
+          '%s added a merchant manager: %3$s.',
+          '%s added merchant managers: %3$s.',
+        ),
+      ),
+
+      '%s removed %s merchant manager(s): %s.' => array(
+        array(
+          '%s removed a merchant manager: %3$s.',
+          '%s removed merchant managers: %3$s.',
+        ),
+      ),
+
+      '%s added %s account manager(s): %s.' => array(
+        array(
+          '%s added an account manager: %3$s.',
+          '%s added account managers: %3$s.',
+        ),
+      ),
+
+      '%s removed %s account manager(s): %s.' => array(
+        array(
+          '%s removed an account manager: %3$s.',
+          '%s removed account managers: %3$s.',
+        ),
+      ),
+
+      'You are about to apply a bulk edit which will affect '.
+      '%s object(s).' => array(
+        'You are about to apply a bulk edit to a single object.',
+        'You are about to apply a bulk edit which will affect '.
+        '%s objects.',
+      ),
+
+      'Destroyed %s credential(s) of type "%s".' => array(
+        'Destroyed one credential of type "%2$s".',
+        'Destroyed %s credentials of type "%s".',
       ),
 
     );

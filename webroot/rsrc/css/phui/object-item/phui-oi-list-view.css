@@ -37,7 +37,7 @@ ul.phui-oi-list-view {
   border-color: {$lightgreyborder};
   margin: 5px 0;
   overflow: hidden;
-  background: #fff;
+  background: {$page.content};
   margin-bottom: 4px;
 }
 
@@ -105,7 +105,7 @@ ul.phui-oi-list-view {
 }
 
 .phui-oi-objname {
-  color: #000;
+  color: {$blacktext};
   cursor: text;
   font-weight: bold;
 }
@@ -180,6 +180,10 @@ ul.phui-oi-list-view {
   width: 160px;
   display: table-cell;
   vertical-align: top;
+}
+
+.phui-oi-col2.phui-oi-side-column {
+  width: 200px;
 }
 
 .device-phone .phui-oi-col1,
@@ -285,6 +289,31 @@ ul.phui-oi-list-view {
   padding: 0 8px 6px;
 }
 
+.phui-oi-description {
+  display: none;
+}
+
+.phui-oi-description.phui-oi-description-reveal {
+  display: block;
+}
+
+.phui-oi-description-tag {
+  margin-left: 4px;
+}
+
+.phui-oi-description-tag:hover .phui-tag-core {
+  cursor: pointer;
+  background: {$darkgreybackground};
+}
+
+.phui-oi-description-tag .phui-tag-core {
+  border: none;
+}
+
+.phui-oi-description-tag.phui-tag-view .phui-icon-view {
+  margin: 2px;
+}
+
 
 /* - Attribute List ------------------------------------------------------------
 
@@ -302,6 +331,7 @@ ul.phui-oi-list-view {
   display: inline-block;
   color: {$greytext};
   vertical-align: top;
+  margin-right: 4px;
 }
 
 .phui-oi-attribute-spacer {
@@ -389,6 +419,17 @@ ul.phui-oi-icons {
   text-decoration: line-through;
 }
 
+.phui-oi.phui-oi-disabled .phui-oi-image {
+  opacity: .8;
+  -webkit-filter: grayscale(100%);
+  filter: grayscale(100%);
+}
+
+.phui-oi.phui-oi-disabled .phui-oi-attribute,
+.phui-oi.phui-oi-disabled .phui-oi-attribute > .phui-icon-view {
+  color: {$lightgreytext};
+}
+
 
 /* - Effects -------------------------------------------------------------------
 
@@ -412,6 +453,10 @@ ul.phui-oi-list-view .phui-oi-highlighted
 ul.phui-oi-list-view .phui-oi-selected
   .phui-oi-frame {
   border-color: {$sh-blueborder};
+}
+
+.phui-oi-forbidden {
+  background: {$sh-redbackground};
 }
 
 
@@ -551,7 +596,7 @@ ul.phui-oi-list-view .phui-oi-selected
   color: {$darkbluetext};
   border-top: 1px solid {$thinblueborder};
   border-bottom: 1px solid {$thinblueborder};
-  padding: 8px;
+  padding: 8px 12px;
   background-color: {$lightgreybackground};
 }
 
@@ -613,13 +658,32 @@ ul.phui-oi-list-view .phui-oi-selected
 
 /* - Launcher Button -------------------------------------------------------- */
 
-.phui-oi-col2.phui-oi-launch-button {
+.phui-oi-col2.phui-oi-side-column {
   text-align: right;
   vertical-align: middle;
   padding-right: 4px;
 }
 
-.device-phone .phui-oi-col2.phui-oi-launch-button {
+.device-phone .phui-oi-col2.phui-oi-side-column {
   padding: 0 8px 8px;
   text-align: left;
+}
+
+.phui-oi-col0.phui-oi-checkbox {
+  width: 28px;
+  text-align: center;
+}
+
+.phui-oi-selectable {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* When the list selection state can be toggled on the client (as in the bulk
+  editor), keep the border color consistent to make the interaction feel more
+  robust. */
+ul.phui-oi-list-view .phui-oi-selectable
+  .phui-oi-frame {
+  border-color: {$blueborder};
 }

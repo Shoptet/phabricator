@@ -28,6 +28,7 @@ final class DifferentialCommitMessageParser extends Phobject {
   private $errors;
   private $commitMessageFields;
   private $raiseMissingFieldErrors = true;
+  private $xactions;
 
   public static function newStandardParser(PhabricatorUser $viewer) {
     $key_title = DifferentialTitleCommitMessageField::FIELDKEY;
@@ -66,7 +67,7 @@ final class DifferentialCommitMessageParser extends Phobject {
   /**
    * @task config
    */
-  public function setCommitMessageFields($fields) {
+  public function setCommitMessageFields(array $fields) {
     assert_instances_of($fields, 'DifferentialCommitMessageField');
     $fields = mpull($fields, null, 'getCommitMessageFieldKey');
     $this->commitMessageFields = $fields;
@@ -134,6 +135,7 @@ final class DifferentialCommitMessageParser extends Phobject {
    */
   public function parseCorpus($corpus) {
     $this->errors = array();
+    $this->xactions = array();
 
     $label_map = $this->getLabelMap();
     $key_title = $this->titleKey;
@@ -155,20 +157,33 @@ final class DifferentialCommitMessageParser extends Phobject {
     $field = $key_title;
 
     $seen = array();
-    $lines = explode("\n", trim($corpus));
+
+    $lines = trim($corpus);
+    $lines = phutil_split_lines($lines, false);
+
     $field_map = array();
     foreach ($lines as $key => $line) {
-      $match = null;
-      if (preg_match($label_regexp, $line, $match)) {
-        $lines[$key] = trim($match['text']);
-        $field = $label_map[self::normalizeFieldLabel($match['field'])];
-        if (!empty($seen[$field])) {
-          $this->errors[] = pht(
-            'Field "%s" occurs twice in commit message!',
-            $field);
-        }
+      // We always parse the first line of the message as a title, even if it
+      // contains something we recognize as a field header.
+      if (!isset($seen[$key_title])) {
+        $field = $key_title;
+
+        $lines[$key] = trim($line);
         $seen[$field] = true;
+      } else {
+        $match = null;
+        if (preg_match($label_regexp, $line, $match)) {
+          $lines[$key] = trim($match['text']);
+          $field = $label_map[self::normalizeFieldLabel($match['field'])];
+          if (!empty($seen[$field])) {
+            $this->errors[] = pht(
+              'Field "%s" occurs twice in commit message!',
+              $match['field']);
+          }
+          $seen[$field] = true;
+        }
       }
+
       $field_map[$key] = $field;
     }
 
@@ -271,12 +286,25 @@ final class DifferentialCommitMessageParser extends Phobject {
       try {
         $result = $field->parseFieldValue($text_value);
         $result_map[$field_key] = $result;
+
+        try {
+          $xactions = $field->getFieldTransactions($result);
+          foreach ($xactions as $xaction) {
+            $this->xactions[] = $xaction;
+          }
+        } catch (Exception $ex) {
+          $this->errors[] = pht(
+            'Error extracting field transactions from "%s": %s',
+            $field->getFieldName(),
+            $ex->getMessage());
+        }
       } catch (DifferentialFieldParseException $ex) {
         $this->errors[] = pht(
           'Error parsing field "%s": %s',
           $field->getFieldName(),
           $ex->getMessage());
       }
+
     }
 
     if ($this->getRaiseMissingFieldErrors()) {
@@ -301,6 +329,14 @@ final class DifferentialCommitMessageParser extends Phobject {
    */
   public function getErrors() {
     return $this->errors;
+  }
+
+
+  /**
+   * @task parse
+   */
+  public function getTransactions() {
+    return $this->xactions;
   }
 
 

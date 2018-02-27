@@ -110,6 +110,24 @@ abstract class PhabricatorModularTransaction
     return parent::getTitle();
   }
 
+  /* final */ public function getActionName() {
+    $action = $this->getTransactionImplementation()->getActionName();
+    if ($action !== null) {
+      return $action;
+    }
+
+    return parent::getActionName();
+  }
+
+  /* final */ public function getActionStrength() {
+    $strength = $this->getTransactionImplementation()->getActionStrength();
+    if ($strength !== null) {
+      return $strength;
+    }
+
+    return parent::getActionStrength();
+  }
+
   public function getTitleForMail() {
     $old_target = $this->getRenderingTarget();
     $new_target = self::TARGET_TEXT;
@@ -142,7 +160,7 @@ abstract class PhabricatorModularTransaction
     return parent::attachViewer($viewer);
   }
 
-  final public function hasChangeDetails() {
+  /* final */ public function hasChangeDetails() {
     if ($this->getTransactionImplementation()->hasChangeDetailView()) {
       return true;
     }
@@ -150,7 +168,7 @@ abstract class PhabricatorModularTransaction
     return parent::hasChangeDetails();
   }
 
-  final public function renderChangeDetails(PhabricatorUser $viewer) {
+  /* final */ public function renderChangeDetails(PhabricatorUser $viewer) {
     $impl = $this->getTransactionImplementation();
     $impl->setViewer($viewer);
     $view = $impl->newChangeDetailView();

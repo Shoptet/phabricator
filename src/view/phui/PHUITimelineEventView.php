@@ -28,6 +28,8 @@ final class PHUITimelineEventView extends AphrontView {
   private $hideCommentOptions = false;
   private $authorPHID;
   private $badges = array();
+  private $pinboardItems = array();
+  private $isSilent;
 
   public function setAuthorPHID($author_phid) {
     $this->authorPHID = $author_phid;
@@ -176,6 +178,15 @@ final class PHUITimelineEventView extends AphrontView {
     return $this;
   }
 
+  public function setIsSilent($is_silent) {
+    $this->isSilent = $is_silent;
+    return $this;
+  }
+
+  public function getIsSilent() {
+    return $this->isSilent;
+  }
+
   public function setReallyMajorEvent($me) {
     $this->reallyMajorEvent = $me;
     return $this;
@@ -188,6 +199,11 @@ final class PHUITimelineEventView extends AphrontView {
 
   public function getHideCommentOptions() {
     return $this->hideCommentOptions;
+  }
+
+  public function addPinboardItem(PHUIPinboardItemView $item) {
+    $this->pinboardItems[] = $item;
+    return $this;
   }
 
   public function setToken($token, $removed = false) {
@@ -285,18 +301,14 @@ final class PHUITimelineEventView extends AphrontView {
 
     $menu = null;
     $items = array();
-    $has_menu = false;
     if (!$this->getIsPreview() && !$this->getHideCommentOptions()) {
       foreach ($this->getEventGroup() as $event) {
         $items[] = $event->getMenuItems($this->anchor);
-        if ($event->hasChildren()) {
-          $has_menu = true;
-        }
       }
       $items = array_mergev($items);
     }
 
-    if ($items || $has_menu) {
+    if ($items) {
       $icon = id(new PHUIIconView())
         ->setIcon('fa-caret-down');
       $aural = javelin_tag(
@@ -335,6 +347,8 @@ final class PHUITimelineEventView extends AphrontView {
         ));
 
       $has_menu = true;
+    } else {
+      $has_menu = false;
     }
 
     // Render "extra" information (timestamp, etc).
@@ -441,12 +455,21 @@ final class PHUITimelineEventView extends AphrontView {
       ),
       $content);
 
+    // Image Events
+    $pinboard = null;
+    if ($this->pinboardItems) {
+      $pinboard = new PHUIPinboardView();
+      foreach ($this->pinboardItems as $item) {
+        $pinboard->addItem($item);
+      }
+    }
+
     $content = phutil_tag(
       'div',
       array(
         'class' => implode(' ', $content_classes),
       ),
-      array($image, $badges, $wedge, $content));
+      array($image, $badges, $wedge, $content, $pinboard));
 
     $outer_classes = $this->classes;
     $outer_classes[] = 'phui-timeline-shell';
@@ -559,6 +582,14 @@ final class PHUITimelineEventView extends AphrontView {
         }
         $extra[] = $date;
       }
+
+      // If this edit was applied silently, give user a hint that they should
+      // not expect to have received any mail or notifications.
+      if ($this->getIsSilent()) {
+        $extra[] = id(new PHUIIconView())
+          ->setIcon('fa-bell-slash', 'red')
+          ->setTooltip(pht('Silent Edit'));
+      }
     }
 
     $extra = javelin_tag(
@@ -606,8 +637,8 @@ final class PHUITimelineEventView extends AphrontView {
 
       $items[] = id(new PhabricatorActionView())
         ->setIcon('fa-quote-left')
+        ->setName(pht('Quote Comment'))
         ->setHref('#')
-        ->setName(pht('Quote'))
         ->addSigil('transaction-quote')
         ->setMetadata(
           array(
@@ -619,9 +650,9 @@ final class PHUITimelineEventView extends AphrontView {
 
     if ($this->getIsNormalComment()) {
       $items[] = id(new PhabricatorActionView())
-        ->setIcon('fa-cutlery')
+        ->setIcon('fa-code')
         ->setHref('/transactions/raw/'.$xaction_phid.'/')
-        ->setName(pht('View Raw'))
+        ->setName(pht('View Remarkup'))
         ->addSigil('transaction-raw')
         ->setMetadata(
           array(
@@ -646,25 +677,29 @@ final class PHUITimelineEventView extends AphrontView {
       }
     }
 
-    if ($this->getIsRemovable()) {
-      $items[] = id(new PhabricatorActionView())
-        ->setIcon('fa-times')
-        ->setHref('/transactions/remove/'.$xaction_phid.'/')
-        ->setName(pht('Remove Comment'))
-        ->addSigil('transaction-remove')
-        ->setMetadata(
-          array(
-            'anchor' => $anchor,
-          ));
-
-    }
-
     if ($this->getIsEdited()) {
       $items[] = id(new PhabricatorActionView())
         ->setIcon('fa-list')
         ->setHref('/transactions/history/'.$xaction_phid.'/')
         ->setName(pht('View Edit History'))
         ->setWorkflow(true);
+    }
+
+    if ($this->getIsRemovable()) {
+      $items[] = id(new PhabricatorActionView())
+        ->setType(PhabricatorActionView::TYPE_DIVIDER);
+
+      $items[] = id(new PhabricatorActionView())
+        ->setIcon('fa-trash-o')
+        ->setHref('/transactions/remove/'.$xaction_phid.'/')
+        ->setName(pht('Remove Comment'))
+        ->setColor(PhabricatorActionView::RED)
+        ->addSigil('transaction-remove')
+        ->setMetadata(
+          array(
+            'anchor' => $anchor,
+          ));
+
     }
 
     return $items;

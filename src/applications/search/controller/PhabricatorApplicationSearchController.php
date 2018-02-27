@@ -7,6 +7,7 @@ final class PhabricatorApplicationSearchController
   private $navigation;
   private $queryKey;
   private $preface;
+  private $activeQuery;
 
   public function setPreface($preface) {
     $this->preface = $preface;
@@ -45,6 +46,14 @@ final class PhabricatorApplicationSearchController
     return $this->searchEngine;
   }
 
+  protected function getActiveQuery() {
+    if (!$this->activeQuery) {
+      throw new Exception(pht('There is no active query yet.'));
+    }
+
+    return $this->activeQuery;
+  }
+
   protected function validateDelegatingController() {
     $parent = $this->getDelegatingController();
 
@@ -65,6 +74,11 @@ final class PhabricatorApplicationSearchController
 
   public function processRequest() {
     $this->validateDelegatingController();
+
+    $query_action = $this->getRequest()->getURIData('queryAction');
+    if ($query_action == 'export') {
+      return $this->processExportRequest();
+    }
 
     $key = $this->getQueryKey();
     if ($key == 'edit') {
@@ -127,7 +141,7 @@ final class PhabricatorApplicationSearchController
       if (!$found_query_data) {
         // Otherwise, there's no query data so just run the user's default
         // query for this application.
-        $query_key = head_key($engine->loadEnabledNamedQueries());
+        $query_key = $engine->getDefaultQueryKey();
       }
     }
 
@@ -149,9 +163,11 @@ final class PhabricatorApplicationSearchController
       $saved_query = $engine->buildSavedQueryFromRequest($request);
 
       // Save the query to generate a query key, so "Save Custom Query..." and
-      // other features like Maniphest's "Export..." work correctly.
+      // other features like "Bulk Edit" and "Export Data" work correctly.
       $engine->saveQuery($saved_query);
     }
+
+    $this->activeQuery = $saved_query;
 
     $nav->selectFilter(
       'query/'.$saved_query->getQueryKey(),
@@ -169,12 +185,15 @@ final class PhabricatorApplicationSearchController
     }
 
     $submit = id(new AphrontFormSubmitControl())
-      ->setValue(pht('Execute Query'));
+      ->setValue(pht('Search'));
 
     if ($run_query && !$named_query && $user->isLoggedIn()) {
-      $submit->addCancelButton(
-        '/search/edit/'.$saved_query->getQueryKey().'/',
-        pht('Save Custom Query...'));
+      $save_button = id(new PHUIButtonView())
+        ->setTag('a')
+        ->setHref('/search/edit/key/'.$saved_query->getQueryKey().'/')
+        ->setText(pht('Save Query'))
+        ->setIcon('fa-floppy-o');
+      $submit->addButton($save_button);
     }
 
     // TODO: A "Create Dashboard Panel" action goes here somewhere once
@@ -239,6 +258,10 @@ final class PhabricatorApplicationSearchController
           $nux_view = null;
         }
 
+        $is_overflowing =
+          $pager->willShowPagingControls() &&
+          $engine->getResultBucket($saved_query);
+
         $force_overheated = $request->getBool('overheated');
         $is_overheated = $query->getIsOverheated() || $force_overheated;
 
@@ -265,6 +288,11 @@ final class PhabricatorApplicationSearchController
           if ($list->getInfoView()) {
             $box->setInfoView($list->getInfoView());
           }
+
+          if ($is_overflowing) {
+            $box->appendChild($this->newOverflowingView());
+          }
+
           if ($list->getContent()) {
             $box->appendChild($list->getContent());
           }
@@ -319,6 +347,8 @@ final class PhabricatorApplicationSearchController
           'query parameters and correct errors.');
       } catch (PhutilSearchQueryCompilerSyntaxException $ex) {
         $exec_errors[] = $ex->getMessage();
+      } catch (PhabricatorSearchConstraintException $ex) {
+        $exec_errors[] = $ex->getMessage();
       }
 
       // The engine may have encountered additional errors during rendering;
@@ -360,10 +390,163 @@ final class PhabricatorApplicationSearchController
       ->appendChild($body);
   }
 
+  private function processExportRequest() {
+    $viewer = $this->getViewer();
+    $engine = $this->getSearchEngine();
+    $request = $this->getRequest();
+
+    if (!$this->canExport()) {
+      return new Aphront404Response();
+    }
+
+    $query_key = $this->getQueryKey();
+    if ($engine->isBuiltinQuery($query_key)) {
+      $saved_query = $engine->buildSavedQueryFromBuiltin($query_key);
+    } else if ($query_key) {
+      $saved_query = id(new PhabricatorSavedQueryQuery())
+        ->setViewer($viewer)
+        ->withQueryKeys(array($query_key))
+        ->executeOne();
+    } else {
+      $saved_query = null;
+    }
+
+    if (!$saved_query) {
+      return new Aphront404Response();
+    }
+
+    $cancel_uri = $engine->getQueryResultsPageURI($query_key);
+
+    $named_query = idx($engine->loadEnabledNamedQueries(), $query_key);
+
+    if ($named_query) {
+      $filename = $named_query->getQueryName();
+      $sheet_title = $named_query->getQueryName();
+    } else {
+      $filename = $engine->getResultTypeDescription();
+      $sheet_title = $engine->getResultTypeDescription();
+    }
+    $filename = phutil_utf8_strtolower($filename);
+    $filename = PhabricatorFile::normalizeFileName($filename);
+
+    $all_formats = PhabricatorExportFormat::getAllExportFormats();
+
+    $available_options = array();
+    $unavailable_options = array();
+    $formats = array();
+    $unavailable_formats = array();
+    foreach ($all_formats as $key => $format) {
+      if ($format->isExportFormatEnabled()) {
+        $available_options[$key] = $format->getExportFormatName();
+        $formats[$key] = $format;
+      } else {
+        $unavailable_options[$key] = pht(
+          '%s (Not Available)',
+          $format->getExportFormatName());
+        $unavailable_formats[$key] = $format;
+      }
+    }
+    $format_options = $available_options + $unavailable_options;
+
+    // Try to default to the format the user used last time. If you just
+    // exported to Excel, you probably want to export to Excel again.
+    $format_key = $this->readExportFormatPreference();
+    if (!isset($formats[$format_key])) {
+      $format_key = head_key($format_options);
+    }
+
+    // Check if this is a large result set or not. If we're exporting a
+    // large amount of data, we'll build the actual export file in the daemons.
+
+    $threshold = 1000;
+    $query = $engine->buildQueryFromSavedQuery($saved_query);
+    $pager = $engine->newPagerForSavedQuery($saved_query);
+    $pager->setPageSize($threshold + 1);
+    $objects = $engine->executeQuery($query, $pager);
+    $object_count = count($objects);
+    $is_large_export = ($object_count > $threshold);
+
+    $errors = array();
+
+    $e_format = null;
+    if ($request->isFormPost()) {
+      $format_key = $request->getStr('format');
+
+      if (isset($unavailable_formats[$format_key])) {
+        $unavailable = $unavailable_formats[$format_key];
+        $instructions = $unavailable->getInstallInstructions();
+
+        $markup = id(new PHUIRemarkupView($viewer, $instructions))
+          ->setRemarkupOption(
+            PHUIRemarkupView::OPTION_PRESERVE_LINEBREAKS,
+            false);
+
+        return $this->newDialog()
+          ->setTitle(pht('Export Format Not Available'))
+          ->appendChild($markup)
+          ->addCancelButton($cancel_uri, pht('Done'));
+      }
+
+      $format = idx($formats, $format_key);
+
+      if (!$format) {
+        $e_format = pht('Invalid');
+        $errors[] = pht('Choose a valid export format.');
+      }
+
+      if (!$errors) {
+        $this->writeExportFormatPreference($format_key);
+
+        $export_engine = id(new PhabricatorExportEngine())
+          ->setViewer($viewer)
+          ->setSearchEngine($engine)
+          ->setSavedQuery($saved_query)
+          ->setTitle($sheet_title)
+          ->setFilename($filename)
+          ->setExportFormat($format);
+
+        if ($is_large_export) {
+          $job = $export_engine->newBulkJob($request);
+
+          return id(new AphrontRedirectResponse())
+            ->setURI($job->getMonitorURI());
+        } else {
+          $file = $export_engine->exportFile();
+
+          return $this->newDialog()
+            ->setTitle(pht('Download Results'))
+            ->appendParagraph(
+              pht('Click the download button to download the exported data.'))
+            ->addCancelButton($cancel_uri, pht('Done'))
+            ->setSubmitURI($file->getDownloadURI())
+            ->setDisableWorkflowOnSubmit(true)
+            ->addSubmitButton(pht('Download Data'));
+        }
+      }
+    }
+
+    $export_form = id(new AphrontFormView())
+      ->setViewer($viewer)
+      ->appendControl(
+        id(new AphrontFormSelectControl())
+          ->setName('format')
+          ->setLabel(pht('Format'))
+          ->setError($e_format)
+          ->setValue($format_key)
+          ->setOptions($format_options));
+
+    return $this->newDialog()
+      ->setTitle(pht('Export Results'))
+      ->setErrors($errors)
+      ->appendForm($export_form)
+      ->addCancelButton($cancel_uri)
+      ->addSubmitButton(pht('Continue'));
+  }
+
   private function processEditRequest() {
     $parent = $this->getDelegatingController();
     $request = $this->getRequest();
-    $user = $request->getUser();
+    $viewer = $request->getUser();
     $engine = $this->getSearchEngine();
 
     $nav = $this->getNavigation();
@@ -373,64 +556,41 @@ final class PhabricatorApplicationSearchController
 
     $named_queries = $engine->loadAllNamedQueries();
 
-    $list_id = celerity_generate_unique_node_id();
+    $can_global = $viewer->getIsAdmin();
 
-    $list = new PHUIObjectItemListView();
-    $list->setUser($user);
-    $list->setID($list_id);
-
-    Javelin::initBehavior(
-      'search-reorder-queries',
-      array(
-        'listID' => $list_id,
-        'orderURI' => '/search/order/'.get_class($engine).'/',
-      ));
+    $groups = array(
+      'personal' => array(
+        'name' => pht('Personal Saved Queries'),
+        'items' => array(),
+        'edit' => true,
+      ),
+      'global' => array(
+        'name' => pht('Global Saved Queries'),
+        'items' => array(),
+        'edit' => $can_global,
+      ),
+    );
 
     foreach ($named_queries as $named_query) {
-      $class = get_class($engine);
-      $key = $named_query->getQueryKey();
-
-      $item = id(new PHUIObjectItemView())
-        ->setHeader($named_query->getQueryName())
-        ->setHref($engine->getQueryResultsPageURI($key));
-
-      if ($named_query->getIsBuiltin() && $named_query->getIsDisabled()) {
-        $icon = 'fa-plus';
+      if ($named_query->isGlobal()) {
+        $group = 'global';
       } else {
-        $icon = 'fa-times';
+        $group = 'personal';
       }
 
-      $item->addAction(
-        id(new PHUIListItemView())
-          ->setIcon($icon)
-          ->setHref('/search/delete/'.$key.'/'.$class.'/')
-          ->setWorkflow(true));
-
-      if ($named_query->getIsBuiltin()) {
-        if ($named_query->getIsDisabled()) {
-          $item->addIcon('fa-times lightgreytext', pht('Disabled'));
-          $item->setDisabled(true);
-        } else {
-          $item->addIcon('fa-lock lightgreytext', pht('Builtin'));
-        }
-      } else {
-        $item->addAction(
-          id(new PHUIListItemView())
-            ->setIcon('fa-pencil')
-            ->setHref('/search/edit/'.$key.'/'));
-      }
-
-      $item->setGrippable(true);
-      $item->addSigil('named-query');
-      $item->setMetadata(
-        array(
-          'queryKey' => $named_query->getQueryKey(),
-        ));
-
-      $list->addItem($item);
+      $groups[$group]['items'][] = $named_query;
     }
 
-    $list->setNoDataString(pht('No saved queries.'));
+    $default_key = $engine->getDefaultQueryKey();
+
+    $lists = array();
+    foreach ($groups as $group) {
+      $lists[] = $this->newQueryListView(
+        $group['name'],
+        $group['items'],
+        $default_key,
+        $group['edit']);
+    }
 
     $crumbs = $parent
       ->buildApplicationCrumbs()
@@ -443,20 +603,144 @@ final class PhabricatorApplicationSearchController
       ->setHeader(pht('Saved Queries'))
       ->setProfileHeader(true);
 
-    $box = id(new PHUIObjectBoxView())
+    $view = id(new PHUITwoColumnView())
       ->setHeader($header)
-      ->setObjectList($list)
-      ->addClass('application-search-results');
-
-    $nav->addClass('application-search-view');
-    require_celerity_resource('application-search-view-css');
+      ->setFooter($lists);
 
     return $this->newPage()
       ->setApplicationMenu($this->buildApplicationMenu())
       ->setTitle(pht('Saved Queries'))
       ->setCrumbs($crumbs)
       ->setNavigation($nav)
-      ->appendChild($box);
+      ->appendChild($view);
+  }
+
+  private function newQueryListView(
+    $list_name,
+    array $named_queries,
+    $default_key,
+    $can_edit) {
+
+    $engine = $this->getSearchEngine();
+    $viewer = $this->getViewer();
+
+    $list = id(new PHUIObjectItemListView())
+      ->setViewer($viewer);
+
+    if ($can_edit) {
+      $list_id = celerity_generate_unique_node_id();
+      $list->setID($list_id);
+
+      Javelin::initBehavior(
+        'search-reorder-queries',
+        array(
+          'listID' => $list_id,
+          'orderURI' => '/search/order/'.get_class($engine).'/',
+        ));
+    }
+
+    foreach ($named_queries as $named_query) {
+      $class = get_class($engine);
+      $key = $named_query->getQueryKey();
+
+      $item = id(new PHUIObjectItemView())
+        ->setHeader($named_query->getQueryName())
+        ->setHref($engine->getQueryResultsPageURI($key));
+
+      if ($named_query->getIsDisabled()) {
+        if ($can_edit) {
+          $item->setDisabled(true);
+        } else {
+          // If an item is disabled and you don't have permission to edit it,
+          // just skip it.
+          continue;
+        }
+      }
+
+      if ($can_edit) {
+        if ($named_query->getIsBuiltin() && $named_query->getIsDisabled()) {
+          $icon = 'fa-plus';
+          $disable_name = pht('Enable');
+        } else {
+          $icon = 'fa-times';
+          if ($named_query->getIsBuiltin()) {
+            $disable_name = pht('Disable');
+          } else {
+            $disable_name = pht('Delete');
+          }
+        }
+
+        if ($named_query->getID()) {
+          $disable_href = '/search/delete/id/'.$named_query->getID().'/';
+        } else {
+          $disable_href = '/search/delete/key/'.$key.'/'.$class.'/';
+        }
+
+        $item->addAction(
+          id(new PHUIListItemView())
+            ->setIcon($icon)
+            ->setHref($disable_href)
+            ->setRenderNameAsTooltip(true)
+            ->setName($disable_name)
+            ->setWorkflow(true));
+      }
+
+      $default_disabled = $named_query->getIsDisabled();
+      $default_icon = 'fa-thumb-tack';
+
+      if ($default_key === $key) {
+        $default_color = 'green';
+      } else {
+        $default_color = null;
+      }
+
+      $item->addAction(
+        id(new PHUIListItemView())
+          ->setIcon("{$default_icon} {$default_color}")
+          ->setHref('/search/default/'.$key.'/'.$class.'/')
+          ->setRenderNameAsTooltip(true)
+          ->setName(pht('Make Default'))
+          ->setWorkflow(true)
+          ->setDisabled($default_disabled));
+
+      if ($can_edit) {
+        if ($named_query->getIsBuiltin()) {
+          $edit_icon = 'fa-lock lightgreytext';
+          $edit_disabled = true;
+          $edit_name = pht('Builtin');
+          $edit_href = null;
+        } else {
+          $edit_icon = 'fa-pencil';
+          $edit_disabled = false;
+          $edit_name = pht('Edit');
+          $edit_href = '/search/edit/id/'.$named_query->getID().'/';
+        }
+
+        $item->addAction(
+          id(new PHUIListItemView())
+            ->setIcon($edit_icon)
+            ->setHref($edit_href)
+            ->setRenderNameAsTooltip(true)
+            ->setName($edit_name)
+            ->setDisabled($edit_disabled));
+      }
+
+      $item->setGrippable($can_edit);
+      $item->addSigil('named-query');
+      $item->setMetadata(
+        array(
+          'queryKey' => $named_query->getQueryKey(),
+        ));
+
+      $list->addItem($item);
+    }
+
+    $list->setNoDataString(pht('No saved queries.'));
+
+    return id(new PHUIObjectBoxView())
+      ->setHeaderText($list_name)
+      ->setBackground(PHUIObjectBoxView::BLUE_PROPERTY)
+      ->setObjectList($list);
   }
 
   public function buildApplicationMenu() {
@@ -540,9 +824,26 @@ final class PhabricatorApplicationSearchController
     return id(new PHUIButtonView())
       ->setTag('a')
       ->setHref('#')
-      ->setText(pht('Use Results...'))
-      ->setIcon('fa-road')
-      ->setDropdownMenu($action_list);
+      ->setText(pht('Use Results'))
+      ->setIcon('fa-bars')
+      ->setDropdownMenu($action_list)
+      ->addClass('dropdown');
+  }
+
+  private function newOverflowingView() {
+    $message = pht(
+      'The query matched more than one page of results. Results are '.
+      'paginated before bucketing, so later pages may contain additional '.
+      'results in any bucket.');
+
+    return id(new PHUIInfoView())
+      ->setSeverity(PHUIInfoView::SEVERITY_WARNING)
+      ->setFlush(true)
+      ->setTitle(pht('Buckets Overflowing'))
+      ->setErrors(
+        array(
+          $message,
+        ));
   }
 
   private function newOverheatedView(array $results) {
@@ -570,8 +871,37 @@ final class PhabricatorApplicationSearchController
 
   private function newBuiltinUseActions() {
     $actions = array();
+    $request = $this->getRequest();
+    $viewer = $request->getUser();
 
     $is_dev = PhabricatorEnv::getEnvConfig('phabricator.developer-mode');
+
+    $engine = $this->getSearchEngine();
+    $engine_class = get_class($engine);
+
+    $query_key = $this->getActiveQuery()->getQueryKey();
+
+    $can_use = $engine->canUseInPanelContext();
+    $is_installed = PhabricatorApplication::isClassInstalledForViewer(
+      'PhabricatorDashboardApplication',
+      $viewer);
+
+    if ($can_use && $is_installed) {
+      $actions[] = id(new PhabricatorActionView())
+        ->setIcon('fa-dashboard')
+        ->setName(pht('Add to Dashboard'))
+        ->setWorkflow(true)
+        ->setHref("/dashboard/panel/install/{$engine_class}/{$query_key}/");
+    }
+
+    if ($this->canExport()) {
+      $export_uri = $engine->getExportURI($query_key);
+      $actions[] = id(new PhabricatorActionView())
+        ->setIcon('fa-download')
+        ->setName(pht('Export Data'))
+        ->setWorkflow(true)
+        ->setHref($export_uri);
+    }
 
     if ($is_dev) {
       $engine = $this->getSearchEngine();
@@ -580,8 +910,8 @@ final class PhabricatorApplicationSearchController
         ->setQueryParam('nux', true);
 
       $actions[] = id(new PhabricatorActionView())
-        ->setIcon('fa-bug')
-        ->setName(pht('Developer: Show New User State'))
+        ->setIcon('fa-user-plus')
+        ->setName(pht('DEV: New User State'))
         ->setHref($nux_uri);
     }
 
@@ -590,12 +920,58 @@ final class PhabricatorApplicationSearchController
         ->setQueryParam('overheated', true);
 
       $actions[] = id(new PhabricatorActionView())
-        ->setIcon('fa-bug')
-        ->setName(pht('Developer: Show Overheated State'))
+        ->setIcon('fa-fire')
+        ->setName(pht('DEV: Overheated State'))
         ->setHref($overheated_uri);
     }
 
     return $actions;
+  }
+
+  private function canExport() {
+    $engine = $this->getSearchEngine();
+    if (!$engine->canExport()) {
+      return false;
+    }
+
+    // Don't allow logged-out users to perform exports. There's no technical
+    // or policy reason they can't, but we don't normally give them access
+    // to write files or jobs. For now, just err on the side of caution.
+
+    $viewer = $this->getViewer();
+    if (!$viewer->getPHID()) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private function readExportFormatPreference() {
+    $viewer = $this->getViewer();
+    $export_key = PhabricatorPolicyFavoritesSetting::SETTINGKEY;
+    return $viewer->getUserSetting($export_key);
+  }
+
+  private function writeExportFormatPreference($value) {
+    $viewer = $this->getViewer();
+    $request = $this->getRequest();
+
+    if (!$viewer->isLoggedIn()) {
+      return;
+    }
+
+    $export_key = PhabricatorPolicyFavoritesSetting::SETTINGKEY;
+    $preferences = PhabricatorUserPreferences::loadUserPreferences($viewer);
+
+    $editor = id(new PhabricatorUserPreferencesEditor())
+      ->setActor($viewer)
+      ->setContentSourceFromRequest($request)
+      ->setContinueOnNoEffect(true)
+      ->setContinueOnMissingFields(true);
+
+    $xactions = array();
+    $xactions[] = $preferences->newTransaction($export_key, $value);
+    $editor->applyTransactions($preferences, $xactions);
   }
 
 }

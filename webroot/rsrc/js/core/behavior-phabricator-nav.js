@@ -18,7 +18,6 @@ JX.behavior('phabricator-nav', function(config) {
   var main = JX.$(config.mainID);
   var drag = JX.$(config.dragID);
 
-
 // - Flexible Navigation Column ------------------------------------------------
 
 
@@ -28,6 +27,10 @@ JX.behavior('phabricator-nav', function(config) {
   JX.enableDispatch(document.body, 'mousemove');
 
   JX.DOM.listen(drag, 'mousedown', null, function(e) {
+    if (!e.isNormalMouseEvent()) {
+      return;
+    }
+
     dragging = JX.$V(e);
 
     // Show the "col-resize" cursor on the whole document while we're
@@ -94,25 +97,59 @@ JX.behavior('phabricator-nav', function(config) {
     }
     JX.DOM.alterClass(document.body, 'jx-drag-col', false);
     dragging = false;
+
+    new JX.Request('/settings/adjust/', JX.bag)
+      .setData(
+        {
+          key: 'filetree.width',
+          value: JX.$V(drag).x
+        })
+      .send();
   });
 
 
-  function resetdrag() {
+  var saved_width = config.width;
+  function savedrag() {
+    saved_width = JX.$V(drag).x;
+
     local.style.width = '';
     drag.style.left = '';
     content.style.marginLeft = '';
   }
 
+  function restoredrag() {
+    if (!saved_width) {
+      return;
+    }
+
+    local.style.width = saved_width + 'px';
+    drag.style.left = saved_width + 'px';
+    content.style.marginLeft = (saved_width + JX.Vector.getDim(drag).x) + 'px';
+  }
+
   var collapsed = config.collapsed;
   JX.Stratcom.listen('differential-filetree-toggle', null, function() {
     collapsed = !collapsed;
+
+    if (collapsed) {
+      savedrag();
+    }
+
     JX.DOM.alterClass(main, 'has-local-nav', !collapsed);
     JX.DOM.alterClass(main, 'has-drag-nav', !collapsed);
     JX.DOM.alterClass(main, 'has-closed-nav', collapsed);
-    resetdrag();
+
+    if (!collapsed) {
+      restoredrag();
+    }
+
     new JX.Request('/settings/adjust/', JX.bag)
       .setData({ key : 'nav-collapsed', value : (collapsed ? 1 : 0) })
       .send();
+
+    // Invoke a resize event so page elements can redraw if they need to. One
+    // example is the selection reticles in Differential.
+    JX.Stratcom.invoke('resize');
   });
 
 
@@ -126,8 +163,19 @@ JX.behavior('phabricator-nav', function(config) {
       return;
     }
 
+    // When the buoyant header is visible, move the menu down below it. This
+    // is a bit of a hack.
+    var banner_height = 0;
+    try {
+      var banner = JX.$('diff-banner');
+      banner_height = JX.Vector.getDim(banner).y;
+    } catch (error) {
+      // Ignore if there's no banner on the page.
+    }
+
     local.style.top = Math.max(
       0,
+      banner_height,
       JX.$V(content).y - Math.max(0, JX.Vector.getScroll().y)) + 'px';
   }
 

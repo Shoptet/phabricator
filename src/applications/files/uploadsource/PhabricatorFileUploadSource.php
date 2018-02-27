@@ -4,14 +4,18 @@ abstract class PhabricatorFileUploadSource
   extends Phobject {
 
   private $name;
-  private $ttl;
+  private $relativeTTL;
   private $viewPolicy;
+  private $mimeType;
+  private $authorPHID;
 
   private $rope;
   private $data;
   private $shouldChunk;
   private $didRewind;
   private $totalBytesWritten = 0;
+  private $totalBytesRead = 0;
+  private $byteLimit = 0;
 
   public function setName($name) {
     $this->name = $name;
@@ -22,13 +26,13 @@ abstract class PhabricatorFileUploadSource
     return $this->name;
   }
 
-  public function setTTL($ttl) {
-    $this->ttl = $ttl;
+  public function setRelativeTTL($relative_ttl) {
+    $this->relativeTTL = $relative_ttl;
     return $this;
   }
 
-  public function getTTL() {
-    return $this->ttl;
+  public function getRelativeTTL() {
+    return $this->relativeTTL;
   }
 
   public function setViewPolicy($view_policy) {
@@ -38,6 +42,33 @@ abstract class PhabricatorFileUploadSource
 
   public function getViewPolicy() {
     return $this->viewPolicy;
+  }
+
+  public function setByteLimit($byte_limit) {
+    $this->byteLimit = $byte_limit;
+    return $this;
+  }
+
+  public function getByteLimit() {
+    return $this->byteLimit;
+  }
+
+  public function setMIMEType($mime_type) {
+    $this->mimeType = $mime_type;
+    return $this;
+  }
+
+  public function getMIMEType() {
+    return $this->mimeType;
+  }
+
+  public function setAuthorPHID($author_phid) {
+    $this->authorPHID = $author_phid;
+    return $this;
+  }
+
+  public function getAuthorPHID() {
+    return $this->authorPHID;
   }
 
   public function uploadFile() {
@@ -81,8 +112,15 @@ abstract class PhabricatorFileUploadSource
       return false;
     }
 
+    $read_bytes = $data->current();
+    $this->totalBytesRead += strlen($read_bytes);
+
+    if ($this->byteLimit && ($this->totalBytesRead > $this->byteLimit)) {
+      throw new PhabricatorFileUploadSourceByteLimitException();
+    }
+
     $rope = $this->getRope();
-    $rope->append($data->current());
+    $rope->append($read_bytes);
 
     return true;
   }
@@ -137,10 +175,6 @@ abstract class PhabricatorFileUploadSource
 
     $parameters = $this->getNewFileParameters();
 
-    $parameters = array(
-      'isPartial' => true,
-    ) + $parameters;
-
     $data_length = $this->getDataLength();
     if ($data_length !== null) {
       $length = $data_length;
@@ -149,7 +183,7 @@ abstract class PhabricatorFileUploadSource
     }
 
     $file = PhabricatorFile::newChunkedFile($engine, $length, $parameters);
-    $file->save();
+    $file->saveAndIndex();
 
     $rope = $this->getRope();
 
@@ -164,8 +198,10 @@ abstract class PhabricatorFileUploadSource
       }
     }
 
-    // If we have extra bytes at the end, write them.
-    if ($rope->getByteLength()) {
+    // If we have extra bytes at the end, write them. Note that it's possible
+    // that we have more than one chunk of bytes left if the read was very
+    // fast.
+    while ($rope->getByteLength()) {
       $this->writeChunk($file, $engine);
     }
 
@@ -190,12 +226,19 @@ abstract class PhabricatorFileUploadSource
     $actual_length = strlen($data);
     $rope->removeBytesFromHead($actual_length);
 
-    $chunk_data = PhabricatorFile::newFromFileData(
-      $data,
-      array(
-        'name' => $file->getMonogram().'.chunk-'.$offset,
-        'viewPolicy' => PhabricatorPolicies::POLICY_NOONE,
-      ));
+    $params = array(
+      'name' => $file->getMonogram().'.chunk-'.$offset,
+      'viewPolicy' => PhabricatorPolicies::POLICY_NOONE,
+      'chunk' => true,
+    );
+
+    // If this isn't the initial chunk, provide a dummy MIME type so we do not
+    // try to detect it. See T12857.
+    if ($offset > 0) {
+      $params['mime-type'] = 'application/octet-stream';
+    }
+
+    $chunk_data = PhabricatorFile::newFromFileData($data, $params);
 
     $chunk = PhabricatorFileChunk::initializeNewChunk(
       $file->getStorageHandle(),
@@ -212,11 +255,27 @@ abstract class PhabricatorFileUploadSource
   }
 
   private function getNewFileParameters() {
-    return array(
+    $parameters = array(
       'name' => $this->getName(),
-      'ttl' => $this->getTTL(),
       'viewPolicy' => $this->getViewPolicy(),
     );
+
+    $ttl = $this->getRelativeTTL();
+    if ($ttl !== null) {
+      $parameters['ttl.relative'] = $ttl;
+    }
+
+    $mime_type = $this->getMimeType();
+    if ($mime_type !== null) {
+      $parameters['mime-type'] = $mime_type;
+    }
+
+    $author_phid = $this->getAuthorPHID();
+    if ($author_phid !== null) {
+      $parameters['authorPHID'] = $author_phid;
+    }
+
+    return $parameters;
   }
 
   private function getChunkEngine() {
