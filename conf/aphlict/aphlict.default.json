@@ -6,7 +6,7 @@
       "listen": "0.0.0.0",
       "ssl.key": "/etc/ssl/shoptet.cz.key",
       "ssl.cert": "/etc/ssl/shoptet.cz.crt",
-      "ssl.chain": null
+      "ssl.chain": "/etc/ssl/rapidssl2.ca"
     },
     {
       "type": "admin",
