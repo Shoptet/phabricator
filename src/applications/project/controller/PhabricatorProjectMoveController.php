@@ -158,11 +158,12 @@ final class PhabricatorProjectMoveController
       break;
     }
 
-    $keyword_map = ManiphestTaskPriority::getTaskPriorityKeywordsMap();
-    $keyword = head(idx($keyword_map, $pri));
-
     $xactions = array();
     if ($pri !== null) {
+      // Petr Hendl: failed on $pri == null, moved after this check
+      $keyword_map = ManiphestTaskPriority::getTaskPriorityKeywordsMap();
+      $keyword = head(idx($keyword_map, $pri));
+
       $xactions[] = id(new ManiphestTransaction())
         ->setTransactionType(ManiphestTaskPriorityTransaction::TRANSACTIONTYPE)
         ->setNewValue($keyword);
