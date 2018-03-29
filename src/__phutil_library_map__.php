@@ -6527,6 +6527,7 @@ phutil_register_library_map(array(
       'PhabricatorApplicationTransactionInterface',
       'PhabricatorPolicyInterface',
       'PhabricatorConduitResultInterface',
+      'PhabricatorDestructibleInterface',
     ),
     'HarbormasterBuildAbortedException' => 'Exception',
     'HarbormasterBuildActionController' => 'HarbormasterController',
@@ -6534,6 +6535,7 @@ phutil_register_library_map(array(
     'HarbormasterBuildArtifact' => array(
       'HarbormasterDAO',
       'PhabricatorPolicyInterface',
+      'PhabricatorDestructibleInterface',
     ),
     'HarbormasterBuildArtifactPHIDType' => 'PhabricatorPHIDType',
     'HarbormasterBuildArtifactQuery' => 'PhabricatorCursorPagedPolicyAwareQuery',
@@ -6566,6 +6568,7 @@ phutil_register_library_map(array(
     'HarbormasterBuildMessage' => array(
       'HarbormasterDAO',
       'PhabricatorPolicyInterface',
+      'PhabricatorDestructibleInterface',
     ),
     'HarbormasterBuildMessageQuery' => 'PhabricatorCursorPagedPolicyAwareQuery',
     'HarbormasterBuildPHIDType' => 'PhabricatorPHIDType',
@@ -6616,6 +6619,7 @@ phutil_register_library_map(array(
     'HarbormasterBuildTarget' => array(
       'HarbormasterDAO',
       'PhabricatorPolicyInterface',
+      'PhabricatorDestructibleInterface',
     ),
     'HarbormasterBuildTargetPHIDType' => 'PhabricatorPHIDType',
     'HarbormasterBuildTargetQuery' => 'PhabricatorCursorPagedPolicyAwareQuery',
@@ -6630,6 +6634,7 @@ phutil_register_library_map(array(
       'PhabricatorApplicationTransactionInterface',
       'PhabricatorPolicyInterface',
       'HarbormasterBuildableInterface',
+      'PhabricatorDestructibleInterface',
     ),
     'HarbormasterBuildableActionController' => 'HarbormasterController',
     'HarbormasterBuildableListController' => 'HarbormasterController',
