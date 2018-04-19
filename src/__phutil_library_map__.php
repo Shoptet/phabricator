@@ -4717,6 +4717,7 @@ phutil_register_library_map(array(
     'PhluxDAO' => 'applications/phlux/storage/PhluxDAO.php',
     'PhluxEditController' => 'applications/phlux/controller/PhluxEditController.php',
     'PhluxListController' => 'applications/phlux/controller/PhluxListController.php',
+    'PhluxSchemaSpec' => 'applications/phlux/storage/PhluxSchemaSpec.php',
     'PhluxTransaction' => 'applications/phlux/storage/PhluxTransaction.php',
     'PhluxTransactionQuery' => 'applications/phlux/query/PhluxTransactionQuery.php',
     'PhluxVariable' => 'applications/phlux/storage/PhluxVariable.php',
@@ -10695,6 +10696,7 @@ phutil_register_library_map(array(
     'PhluxDAO' => 'PhabricatorLiskDAO',
     'PhluxEditController' => 'PhluxController',
     'PhluxListController' => 'PhluxController',
+    'PhluxSchemaSpec' => 'PhabricatorConfigSchemaSpec',
     'PhluxTransaction' => 'PhabricatorApplicationTransaction',
     'PhluxTransactionQuery' => 'PhabricatorApplicationTransactionQuery',
     'PhluxVariable' => array(
