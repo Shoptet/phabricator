@@ -4033,6 +4033,7 @@ phutil_register_library_map(array(
     'PhabricatorPygmentSetupCheck' => 'applications/config/check/PhabricatorPygmentSetupCheck.php',
     'PhabricatorQuery' => 'infrastructure/query/PhabricatorQuery.php',
     'PhabricatorQueryConstraint' => 'infrastructure/query/constraint/PhabricatorQueryConstraint.php',
+    'PhabricatorQueryIterator' => 'infrastructure/storage/lisk/PhabricatorQueryIterator.php',
     'PhabricatorQueryOrderItem' => 'infrastructure/query/order/PhabricatorQueryOrderItem.php',
     'PhabricatorQueryOrderTestCase' => 'infrastructure/query/order/__tests__/PhabricatorQueryOrderTestCase.php',
     'PhabricatorQueryOrderVector' => 'infrastructure/query/order/PhabricatorQueryOrderVector.php',
@@ -9878,6 +9879,7 @@ phutil_register_library_map(array(
     'PhabricatorPygmentSetupCheck' => 'PhabricatorSetupCheck',
     'PhabricatorQuery' => 'Phobject',
     'PhabricatorQueryConstraint' => 'Phobject',
+    'PhabricatorQueryIterator' => 'PhutilBufferedIterator',
     'PhabricatorQueryOrderItem' => 'Phobject',
     'PhabricatorQueryOrderTestCase' => 'PhabricatorTestCase',
     'PhabricatorQueryOrderVector' => array(
