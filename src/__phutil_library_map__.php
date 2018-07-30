@@ -9754,6 +9754,7 @@ phutil_register_library_map(array(
       'PhabricatorFerretInterface',
       'PhabricatorConduitResultInterface',
       'PhabricatorColumnProxyInterface',
+      'PhabricatorSpacesInterface',
     ),
     'PhabricatorProjectAddHeraldAction' => 'PhabricatorProjectHeraldAction',
     'PhabricatorProjectApplication' => 'PhabricatorApplication',
