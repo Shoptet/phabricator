@@ -11131,6 +11131,7 @@ phutil_register_library_map(array(
       'PhabricatorApplicationTransactionInterface',
       'PhabricatorConduitResultInterface',
       'PhabricatorPolicyCodexInterface',
+      'PhabricatorSpacesInterface',
     ),
     'PhrictionDocumentAuthorHeraldField' => 'PhrictionDocumentHeraldField',
     'PhrictionDocumentContentHeraldField' => 'PhrictionDocumentHeraldField',
