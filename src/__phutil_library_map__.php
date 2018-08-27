@@ -8292,10 +8292,7 @@ phutil_register_library_map(array(
     'PhabricatorConfigManualActivity' => 'PhabricatorConfigEntryDAO',
     'PhabricatorConfigModule' => 'Phobject',
     'PhabricatorConfigModuleController' => 'PhabricatorConfigController',
-    'PhabricatorConfigOption' => array(
-      'Phobject',
-      'PhabricatorMarkupInterface',
-    ),
+    'PhabricatorConfigOption' => 'Phobject',
     'PhabricatorConfigOptionType' => 'Phobject',
     'PhabricatorConfigPHIDModule' => 'PhabricatorConfigModule',
     'PhabricatorConfigProxySource' => 'PhabricatorConfigSource',
