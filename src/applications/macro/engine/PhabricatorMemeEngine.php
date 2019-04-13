@@ -47,10 +47,13 @@ final class PhabricatorMemeEngine extends Phobject {
   }
 
   public function getGenerateURI() {
-    return id(new PhutilURI('/macro/meme/'))
-      ->alter('macro', $this->getTemplate())
-      ->alter('above', $this->getAboveText())
-      ->alter('below', $this->getBelowText());
+    $params = array(
+      'macro' => $this->getTemplate(),
+      'above' => $this->getAboveText(),
+      'below' => $this->getBelowText(),
+    );
+
+    return new PhutilURI('/macro/meme/', $params);
   }
 
   public function newAsset() {
@@ -173,6 +176,15 @@ final class PhabricatorMemeEngine extends Phobject {
 
   private function newAssetData(PhabricatorFile $template) {
     $template_data = $template->loadFileData();
+
+    // When we aren't adding text, just return the data unmodified. This saves
+    // us from doing expensive stitching when we aren't actually making any
+    // changes to the image.
+    $above_text = $this->getAboveText();
+    $below_text = $this->getBelowText();
+    if (!strlen(trim($above_text)) && !strlen(trim($below_text))) {
+      return $template_data;
+    }
 
     $result = $this->newImagemagickAsset($template, $template_data);
     if ($result) {

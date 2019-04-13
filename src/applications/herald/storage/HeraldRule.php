@@ -6,6 +6,7 @@ final class HeraldRule extends HeraldDAO
     PhabricatorFlaggableInterface,
     PhabricatorPolicyInterface,
     PhabricatorDestructibleInterface,
+    PhabricatorIndexableInterface,
     PhabricatorSubscribableInterface {
 
   const TABLE_RULE_APPLIED = 'herald_ruleapplied';
@@ -318,19 +319,8 @@ final class HeraldRule extends HeraldDAO
     return new HeraldRuleEditor();
   }
 
-  public function getApplicationTransactionObject() {
-    return $this;
-  }
-
   public function getApplicationTransactionTemplate() {
     return new HeraldRuleTransaction();
-  }
-
-  public function willRenderTimeline(
-    PhabricatorApplicationTransactionView $timeline,
-    AphrontRequest $request) {
-
-    return $timeline;
   }
 
 

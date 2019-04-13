@@ -54,6 +54,12 @@ final class DifferentialChangesetEngine extends Phobject {
       if (strpos($new_data, '@'.'generated') !== false) {
         return true;
       }
+
+      // See PHI1112. This is the official pattern for marking Go code as
+      // generated.
+      if (preg_match('(^// Code generated .* DO NOT EDIT\.$)m', $new_data)) {
+        return true;
+      }
     }
 
     return false;
@@ -88,6 +94,20 @@ final class DifferentialChangesetEngine extends Phobject {
 
 
   private function detectCopiedCode(array $changesets) {
+    // See PHI944. If the total number of changed lines is excessively large,
+    // don't bother with copied code detection. This can take a lot of time and
+    // memory and it's not generally of any use for very large changes.
+    $max_size = 65535;
+
+    $total_size = 0;
+    foreach ($changesets as $changeset) {
+      $total_size += ($changeset->getAddLines() + $changeset->getDelLines());
+    }
+
+    if ($total_size > $max_size) {
+      return;
+    }
+
     $min_width = 30;
     $min_lines = 3;
 

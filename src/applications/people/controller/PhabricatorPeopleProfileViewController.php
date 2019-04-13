@@ -74,6 +74,10 @@ final class PhabricatorPeopleProfileViewController
       ->setTitle($user->getUsername())
       ->setNavigation($nav)
       ->setCrumbs($crumbs)
+      ->setPageObjectPHIDs(
+        array(
+          $user->getPHID(),
+        ))
       ->appendChild(
         array(
           $home,
@@ -168,6 +172,12 @@ final class PhabricatorPeopleProfileViewController
     $class = 'PhabricatorCalendarApplication';
 
     if (!PhabricatorApplication::isClassInstalledForViewer($class, $viewer)) {
+      return null;
+    }
+
+    // Don't show calendar information for disabled users, since it's probably
+    // not useful or accurate and may be misleading.
+    if ($user->getIsDisabled()) {
       return null;
     }
 

@@ -55,12 +55,12 @@ final class PhabricatorProjectTransactionEditor
         case PhabricatorProjectParentTransaction::TRANSACTIONTYPE:
         case PhabricatorProjectMilestoneTransaction::TRANSACTIONTYPE:
           if ($xaction->getNewValue() === null) {
-            continue;
+            continue 2;
           }
 
           if (!$parent_xaction) {
             $parent_xaction = $xaction;
-            continue;
+            continue 2;
           }
 
           $errors[] = new PhabricatorApplicationTransactionValidationError(
@@ -71,8 +71,7 @@ final class PhabricatorProjectTransactionEditor
               'project or milestone project. A project can not be both a '.
               'subproject and a milestone.'),
             $xaction);
-          break;
-          break;
+          break 2;
       }
     }
 
@@ -249,6 +248,17 @@ final class PhabricatorProjectTransactionEditor
       id(new PhabricatorProjectsMembershipIndexEngineExtension())
         ->rematerialize($new_parent);
     }
+
+    // See PHI1046. Milestones are always in the Space of their parent project.
+    // Synchronize the database values to match the application values.
+    $conn = $object->establishConnection('w');
+    queryfx(
+      $conn,
+      'UPDATE %R SET spacePHID = %ns
+        WHERE parentProjectPHID = %s AND milestoneNumber IS NOT NULL',
+      $object,
+      $object->getSpacePHID(),
+      $object->getPHID());
 
     return parent::applyFinalEffects($object, $xactions);
   }

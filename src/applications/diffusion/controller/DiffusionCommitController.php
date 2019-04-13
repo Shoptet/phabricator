@@ -45,6 +45,7 @@ final class DiffusionCommitController extends DiffusionController {
       ->withIdentifiers(array($commit_identifier))
       ->needCommitData(true)
       ->needAuditRequests(true)
+      ->needAuditAuthority(array($viewer))
       ->setLimit(100)
       ->needIdentities(true)
       ->execute();
@@ -111,7 +112,6 @@ final class DiffusionCommitController extends DiffusionController {
     }
 
     $audit_requests = $commit->getAudits();
-    $commit->loadAndAttachAuditAuthority($viewer);
 
     $commit_data = $commit->getCommitData();
     $is_foreign = $commit_data->getCommitDetail('foreign-svn-stub');
@@ -171,13 +171,12 @@ final class DiffusionCommitController extends DiffusionController {
         ->setHeaderIcon('fa-code-fork')
         ->addTag($commit_tag);
 
-      if ($commit->getAuditStatus()) {
-        $icon = PhabricatorAuditCommitStatusConstants::getStatusIcon(
-          $commit->getAuditStatus());
-        $color = PhabricatorAuditCommitStatusConstants::getStatusColor(
-          $commit->getAuditStatus());
-        $status = PhabricatorAuditCommitStatusConstants::getStatusName(
-          $commit->getAuditStatus());
+      if (!$commit->isAuditStatusNoAudit()) {
+        $status = $commit->getAuditStatusObject();
+
+        $icon = $status->getIcon();
+        $color = $status->getColor();
+        $status = $status->getName();
 
         $header->setStatus($icon, $color, $status);
       }
@@ -740,8 +739,6 @@ final class DiffusionCommitController extends DiffusionController {
     $timeline = $this->buildTransactionTimeline(
       $commit,
       new PhabricatorAuditTransactionQuery());
-
-    $commit->willRenderTimeline($timeline, $this->getRequest());
 
     $timeline->setQuoteRef($commit->getMonogram());
 

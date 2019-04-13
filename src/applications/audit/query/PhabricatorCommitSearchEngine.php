@@ -15,6 +15,7 @@ final class PhabricatorCommitSearchEngine
     return id(new DiffusionCommitQuery())
       ->needAuditRequests(true)
       ->needCommitData(true)
+      ->needIdentities(true)
       ->needDrafts(true);
   }
 
@@ -57,6 +58,10 @@ final class PhabricatorCommitSearchEngine
       $query->withAncestorsOf($map['ancestorsOf']);
     }
 
+    if ($map['identifiers']) {
+      $query->withIdentifiers($map['identifiers']);
+    }
+
     return $query;
   }
 
@@ -92,7 +97,9 @@ final class PhabricatorCommitSearchEngine
         ->setLabel(pht('Audit Status'))
         ->setKey('statuses')
         ->setAliases(array('status'))
-        ->setOptions(PhabricatorAuditCommitStatusConstants::getStatusNameMap())
+        ->setOptions(DiffusionCommitAuditStatus::newOptions())
+        ->setDeprecatedOptions(
+          DiffusionCommitAuditStatus::newDeprecatedOptions())
         ->setDescription(pht('Find commits with given audit statuses.')),
       id(new PhabricatorSearchDatasourceField())
         ->setLabel(pht('Repositories'))
@@ -127,6 +134,15 @@ final class PhabricatorCommitSearchEngine
           pht(
             'Find commits which are ancestors of a particular ref, '.
             'like "master".')),
+      id(new PhabricatorSearchStringListField())
+        ->setLabel(pht('Identifiers'))
+        ->setKey('identifiers')
+        ->setDescription(
+          pht(
+            'Find commits with particular identifiers (usually, hashes). '.
+            'Supports full or partial identifiers (like "abcd12340987..." or '.
+            '"abcd1234") and qualified or unqualified identifiers (like '.
+            '"rXabcd1234" or "abcd1234").')),
     );
   }
 
@@ -160,7 +176,7 @@ final class PhabricatorCommitSearchEngine
       case 'active':
         $bucket_key = DiffusionCommitRequiredActionResultBucket::BUCKETKEY;
 
-        $open = PhabricatorAuditCommitStatusConstants::getOpenStatusConstants();
+        $open = DiffusionCommitAuditStatus::getOpenStatusConstants();
 
         $query
           ->setParameter('responsiblePHIDs', array($viewer_phid))

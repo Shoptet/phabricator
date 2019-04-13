@@ -11,8 +11,8 @@ final class PhabricatorUserTransaction
     return PhabricatorPeopleUserPHIDType::TYPECONST;
   }
 
-  public function getApplicationTransactionCommentObject() {
-    return null;
+  public function getBaseTransactionClass() {
+    return 'PhabricatorUserTransactionType';
   }
 
   public function getBaseTransactionClass() {
