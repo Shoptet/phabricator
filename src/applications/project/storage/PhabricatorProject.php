@@ -719,17 +719,6 @@ final class PhabricatorProject extends PhabricatorProjectDAO
   }
 
 
-/* -(  PhabricatorSpacesInterface  )----------------------------------------- */
-
-
-  public function getSpacePHID() {
-    if ($this->isMilestone()) {
-      return $this->getParentProject()->getSpacePHID();
-    }
-    return $this->spacePHID;
-  }
-
-
 /* -(  PhabricatorDestructibleInterface  )----------------------------------- */
 
 

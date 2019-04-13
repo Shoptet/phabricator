@@ -15,8 +15,4 @@ final class PhabricatorUserTransaction
     return 'PhabricatorUserTransactionType';
   }
 
-  public function getBaseTransactionClass() {
-    return 'PhabricatorUserTransactionType';
-  }
-
 }
