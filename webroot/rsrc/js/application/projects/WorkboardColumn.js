@@ -246,10 +246,11 @@ JX.install('WorkboardColumn', {
               next = header_keys.pop();
 
               var header = this.getHeader(next);
-              objects.push(header);
+//              objects.push(header);
               seen_headers[header_key] = true;
 
               if (next === header_key) {
+                  objects.push(header);
                 break;
               }
             }
@@ -270,7 +271,7 @@ JX.install('WorkboardColumn', {
           continue;
         }
 
-        objects.push(this.getHeader(next));
+//        objects.push(this.getHeader(next));
       }
 
       this._objects = objects;
