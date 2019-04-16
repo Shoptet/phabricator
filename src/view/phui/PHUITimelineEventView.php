@@ -424,7 +424,7 @@ final class PHUITimelineEventView extends AphrontView {
         ($this->userHandle->getURI()) ? 'a' : 'div',
         array(
           'style' => 'background-image: url('.$image_uri.')',
-          'class' => 'phui-timeline-image visual-only',
+          'class' => 'phui-timeline-image',
           'href' => $this->userHandle->getURI(),
           'aural' => false,
         ),

@@ -211,13 +211,6 @@ final class PhabricatorMailManagementSendTestWorkflow
             implode(', ', array_keys($mailers))));
       }
 
-      if (!$mailers[$mailer_key]->getSupportsOutbound()) {
-        throw new PhutilArgumentUsageException(
-          pht(
-            'Mailer ("%s") is not configured to support outbound mail.',
-            $mailer_key));
-      }
-
       $mail->setTryMailers(array($mailer_key));
     }
 

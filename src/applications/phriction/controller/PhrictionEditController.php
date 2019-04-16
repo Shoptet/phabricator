@@ -216,7 +216,6 @@ final class PhrictionEditController
     $view_capability = PhabricatorPolicyCapability::CAN_VIEW;
     $edit_capability = PhabricatorPolicyCapability::CAN_EDIT;
 
-
     $form = id(new AphrontFormView())
       ->setUser($viewer)
       ->addHiddenInput('slug', $document->getSlug())

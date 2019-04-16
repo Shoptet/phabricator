@@ -657,38 +657,6 @@ final class PhabricatorMetaMTAMail
       }
     }
 
-    // Remove mailers with the wrong types.
-    if (isset($constraints['types'])) {
-      $types = $constraints['types'];
-      $types = array_fuse($types);
-      foreach ($mailers as $key => $mailer) {
-        $mailer_type = $mailer->getAdapterType();
-        if (!isset($types[$mailer_type])) {
-          unset($mailers[$key]);
-        }
-      }
-    }
-
-    // If we're only looking for inbound mailers, remove mailers with inbound
-    // support disabled.
-    if (!empty($constraints['inbound'])) {
-      foreach ($mailers as $key => $mailer) {
-        if (!$mailer->getSupportsInbound()) {
-          unset($mailers[$key]);
-        }
-      }
-    }
-
-    // If we're only looking for outbound mailers, remove mailers with outbound
-    // support disabled.
-    if (!empty($constraints['outbound'])) {
-      foreach ($mailers as $key => $mailer) {
-        if (!$mailer->getSupportsOutbound()) {
-          unset($mailers[$key]);
-        }
-      }
-    }
-
     $sorted = array();
     $groups = mgroup($mailers, 'getPriority');
     krsort($groups);
