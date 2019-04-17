@@ -252,6 +252,7 @@ JX.install('WorkboardColumn', {
               if (next === header_key) {
                 break;
               }
+              header.getNode().setAttribute('style', 'height: 0; padding: 0; opacity: 0; margin-bottom: 0;');
             }
           }
         }
@@ -270,7 +271,9 @@ JX.install('WorkboardColumn', {
           continue;
         }
 
-        objects.push(this.getHeader(next));
+        var hdr = this.getHeader(next);
+        hdr.getNode().setAttribute('style', 'height: 0; padding: 0; opacity: 0; margin-bottom: 0;');
+        objects.push(hdr);
       }
 
       this._objects = objects;

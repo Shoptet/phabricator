@@ -412,7 +412,7 @@ return array(
     'rsrc/js/application/projects/WorkboardBoard.js' => 'c02a5497',
     'rsrc/js/application/projects/WorkboardCard.js' => '0392a5d8',
     'rsrc/js/application/projects/WorkboardCardTemplate.js' => '2a61f8d4',
-    'rsrc/js/application/projects/WorkboardColumn.js' => 'c3d24e63',
+    'rsrc/js/application/projects/WorkboardColumn.js' => 'b85b6ddf',
     'rsrc/js/application/projects/WorkboardController.js' => '42c7a5a7',
     'rsrc/js/application/projects/WorkboardDropEffect.js' => '8e0aa661',
     'rsrc/js/application/projects/WorkboardHeader.js' => '111bfd2d',
@@ -740,7 +740,7 @@ return array(
     'javelin-workboard-board' => 'c02a5497',
     'javelin-workboard-card' => '0392a5d8',
     'javelin-workboard-card-template' => '2a61f8d4',
-    'javelin-workboard-column' => 'c3d24e63',
+    'javelin-workboard-column' => 'b85b6ddf',
     'javelin-workboard-controller' => '42c7a5a7',
     'javelin-workboard-drop-effect' => '8e0aa661',
     'javelin-workboard-header' => '111bfd2d',
@@ -1909,6 +1909,11 @@ return array(
       'javelin-util',
       'phabricator-shaped-request',
     ),
+    'b85b6ddf' => array(
+      'javelin-install',
+      'javelin-workboard-card',
+      'javelin-workboard-header',
+    ),
     'b86f297f' => array(
       'javelin-behavior',
       'javelin-stratcom',
@@ -1962,11 +1967,6 @@ return array(
       'javelin-aphlict',
       'phabricator-phtize',
       'javelin-dom',
-    ),
-    'c3d24e63' => array(
-      'javelin-install',
-      'javelin-workboard-card',
-      'javelin-workboard-header',
     ),
     'c687e867' => array(
       'javelin-behavior',
