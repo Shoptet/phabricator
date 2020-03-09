@@ -566,6 +566,18 @@ abstract class PhabricatorEditEngine
     return $this->getObjectViewURI($object);
   }
 
+  /**
+   * @task uri
+   */
+  public function getCreateURI($form_key) {
+    try {
+      $create_uri = $this->getEditURI(null, "form/{$form_key}/");
+    } catch (Exception $ex) {
+      $create_uri = null;
+    }
+
+    return $create_uri;
+  }
 
   /**
    * @task uri
@@ -2511,6 +2523,8 @@ abstract class PhabricatorEditEngine
   }
 
   final public function newBulkEditMap() {
+    $viewer = $this->getViewer();
+
     $config = $this->loadDefaultConfiguration();
     if (!$config) {
       throw new Exception(
@@ -2529,6 +2543,8 @@ abstract class PhabricatorEditEngine
       if ($bulk_type === null) {
         continue;
       }
+
+      $bulk_type->setViewer($viewer);
 
       $bulk_label = $type->getBulkEditLabel();
       if ($bulk_label === null) {

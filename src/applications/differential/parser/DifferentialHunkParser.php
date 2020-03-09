@@ -36,7 +36,7 @@ final class DifferentialHunkParser extends Phobject {
   }
   public function getVisibleLinesMask() {
     if ($this->visibleLinesMask === null) {
-      throw new PhutilInvalidStateException('generateVisibileLinesMask');
+      throw new PhutilInvalidStateException('generateVisibleLinesMask');
     }
     return $this->visibleLinesMask;
   }
@@ -354,13 +354,77 @@ final class DifferentialHunkParser extends Phobject {
     return $this;
   }
 
-  public function generateVisibileLinesMask($lines_context) {
+  public function generateVisibleBlocksMask($lines_context) {
+
+    // See T13468. This is similar to "generateVisibleLinesMask()", but
+    // attempts to work around a series of bugs which cancel each other
+    // out but make a mess of the intermediate steps.
+
+    $old = $this->getOldLines();
+    $new = $this->getNewLines();
+
+    $length = max(count($old), count($new));
+
+    $visible_lines = array();
+    for ($ii = 0; $ii < $length; $ii++) {
+      $old_visible = (isset($old[$ii]) && $old[$ii]['type']);
+      $new_visible = (isset($new[$ii]) && $new[$ii]['type']);
+
+      $visible_lines[$ii] = ($old_visible || $new_visible);
+    }
+
+    $mask = array();
+    $reveal_cursor = -1;
+    for ($ii = 0; $ii < $length; $ii++) {
+
+      // If this line isn't visible, it isn't going to reveal anything.
+      if (!$visible_lines[$ii]) {
+
+        // If it hasn't been revealed by a nearby line, mark it as masked.
+        if (empty($mask[$ii])) {
+          $mask[$ii] = false;
+        }
+
+        continue;
+      }
+
+      // If this line is visible, reveal all the lines nearby.
+
+      // First, compute the minimum and maximum offsets we want to reveal.
+      $min_reveal = max($ii - $lines_context, 0);
+      $max_reveal = min($ii + $lines_context, $length - 1);
+
+      // Naively, we'd do more work than necessary when revealing context for
+      // several adjacent visible lines: we would mark all the overlapping
+      // lines as revealed several times.
+
+      // To avoid duplicating work, keep track of the largest line we've
+      // revealed to. Since we reveal context by marking every consecutive
+      // line, we don't need to touch any line above it.
+      $min_reveal = max($min_reveal, $reveal_cursor);
+
+      // Reveal the remaining unrevealed lines.
+      for ($jj = $min_reveal; $jj <= $max_reveal; $jj++) {
+        $mask[$jj] = true;
+      }
+
+      // Move the cursor to the next line which may still need to be revealed.
+      $reveal_cursor = $max_reveal + 1;
+    }
+
+    $this->setVisibleLinesMask($mask);
+
+    return $mask;
+  }
+
+  public function generateVisibleLinesMask($lines_context) {
     $old = $this->getOldLines();
     $new = $this->getNewLines();
     $max_length = max(count($old), count($new));
     $visible = false;
     $last = 0;
     $mask = array();
+
     for ($cursor = -$lines_context; $cursor < $max_length; $cursor++) {
       $offset = $cursor + $lines_context;
       if ((isset($old[$offset]) && $old[$offset]['type']) ||
@@ -791,7 +855,7 @@ final class DifferentialHunkParser extends Phobject {
     // of the lines, and these copies truly weren't any different.
     //
     // When lines are aligned and marked identical, but they're not actually
-    // identcal, we now mark them as changed. The rest of the processing will
+    // identical, we now mark them as changed. The rest of the processing will
     // figure out how to render them appropritely.
 
     $new = $this->getNewLines();

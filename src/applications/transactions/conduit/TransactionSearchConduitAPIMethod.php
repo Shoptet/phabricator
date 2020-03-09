@@ -103,8 +103,11 @@ EOREMARKUP
     if (!($object instanceof PhabricatorApplicationTransactionInterface)) {
       throw new Exception(
         pht(
-          'Object "%s" does not implement "%s", so transactions can not '.
-          'be loaded for it.'));
+          'Object "%s" (of type "%s") does not implement "%s", so '.
+          'transactions can not be loaded for it.',
+          $object_name,
+          get_class($object),
+          'PhabricatorApplicationTransactionInterface'));
     }
 
     $xaction_query = PhabricatorApplicationTransactionQuery::newQueryForObject(
@@ -253,7 +256,18 @@ EOREMARKUP
                 break;
             }
             break;
+          case PhabricatorTransactions::TYPE_SUBSCRIBERS:
+            $type = 'subscribers';
+            $fields = $this->newEdgeTransactionFields($xaction);
+            break;
         }
+      }
+
+      $group_id = $xaction->getTransactionGroupID();
+      if (!strlen($group_id)) {
+        $group_id = null;
+      } else {
+        $group_id = (string)$group_id;
       }
 
       $data[] = array(
@@ -264,6 +278,7 @@ EOREMARKUP
         'objectPHID' => (string)$xaction->getObjectPHID(),
         'dateCreated' => (int)$xaction->getDateCreated(),
         'dateModified' => (int)$xaction->getDateModified(),
+        'groupID' => $group_id,
         'comments' => $comment_data,
         'fields' => $fields,
       );

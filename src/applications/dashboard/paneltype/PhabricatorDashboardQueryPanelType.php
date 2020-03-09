@@ -21,50 +21,38 @@ final class PhabricatorDashboardQueryPanelType
       'revisions you need to review.');
   }
 
-  public function getFieldSpecifications() {
+  protected function newEditEngineFields(PhabricatorDashboardPanel $panel) {
+    $application_field =
+      id(new PhabricatorDashboardQueryPanelApplicationEditField())
+        ->setKey('class')
+        ->setLabel(pht('Search For'))
+        ->setTransactionType(
+          PhabricatorDashboardQueryPanelApplicationTransaction::TRANSACTIONTYPE)
+        ->setValue($panel->getProperty('class', ''));
+
+    $application_id = $application_field->getControlID();
+
+    $query_field =
+      id(new PhabricatorDashboardQueryPanelQueryEditField())
+        ->setKey('key')
+        ->setLabel(pht('Query'))
+        ->setApplicationControlID($application_id)
+        ->setTransactionType(
+          PhabricatorDashboardQueryPanelQueryTransaction::TRANSACTIONTYPE)
+        ->setValue($panel->getProperty('key', ''));
+
+    $limit_field = id(new PhabricatorIntEditField())
+      ->setKey('limit')
+      ->setLabel(pht('Limit'))
+      ->setTransactionType(
+        PhabricatorDashboardQueryPanelLimitTransaction::TRANSACTIONTYPE)
+      ->setValue($panel->getProperty('limit'));
+
     return array(
-      'class' => array(
-        'name' => pht('Search For'),
-        'type' => 'search.application',
-      ),
-      'key' => array(
-        'name' => pht('Query'),
-        'type' => 'search.query',
-        'control.application' => 'class',
-      ),
-      'limit' => array(
-        'name' => pht('Limit'),
-        'caption' => pht('Leave this blank for the default number of items.'),
-        'type' => 'text',
-      ),
+      $application_field,
+      $query_field,
+      $limit_field,
     );
-  }
-
-  public function initializeFieldsFromRequest(
-    PhabricatorDashboardPanel $panel,
-    PhabricatorCustomFieldList $field_list,
-    AphrontRequest $request) {
-
-    $map = array();
-    if (strlen($request->getStr('engine'))) {
-      $map['class'] = $request->getStr('engine');
-    }
-
-    if (strlen($request->getStr('query'))) {
-      $map['key'] = $request->getStr('query');
-    }
-
-    $full_map = array();
-    foreach ($map as $key => $value) {
-      $full_map["std:dashboard:core:{$key}"] = $value;
-    }
-
-    foreach ($field_list->getFields() as $field) {
-      $field_key = $field->getFieldKey();
-      if (isset($full_map[$field_key])) {
-        $field->setValueFromStorage($full_map[$field_key]);
-      }
-    }
   }
 
   public function renderPanelContent(
@@ -219,6 +207,28 @@ final class PhabricatorDashboardQueryPanelType
     }
 
     return $engine;
+  }
+
+  public function newHeaderEditActions(
+    PhabricatorDashboardPanel $panel,
+    PhabricatorUser $viewer,
+    $context_phid) {
+    $actions = array();
+
+    $engine = $this->getSearchEngine($panel);
+
+    $customize_uri = $engine->getCustomizeURI(
+      $panel->getProperty('key'),
+      $panel->getPHID(),
+      $context_phid);
+
+    $actions[] = id(new PhabricatorActionView())
+      ->setIcon('fa-pencil-square-o')
+      ->setName(pht('Customize Query'))
+      ->setWorkflow(true)
+      ->setHref($customize_uri);
+
+    return $actions;
   }
 
 }

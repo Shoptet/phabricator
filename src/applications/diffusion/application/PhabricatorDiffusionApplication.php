@@ -40,6 +40,7 @@ final class PhabricatorDiffusionApplication extends PhabricatorApplication {
       new DiffusionCommitRemarkupRule(),
       new DiffusionRepositoryRemarkupRule(),
       new DiffusionRepositoryByIDRemarkupRule(),
+      new DiffusionSourceLinkRemarkupRule(),
     );
   }
 
@@ -86,6 +87,7 @@ final class PhabricatorDiffusionApplication extends PhabricatorApplication {
           'enormous/' => 'DiffusionRepositoryEditEnormousController',
           'delete/' => 'DiffusionRepositoryEditDeleteController',
           'update/' => 'DiffusionRepositoryEditUpdateController',
+          'publish/' => 'DiffusionRepositoryEditPublishingController',
           'testautomation/' => 'DiffusionRepositoryTestAutomationController',
         ),
         'pathtree/(?P<dblob>.*)' => 'DiffusionPathTreeController',

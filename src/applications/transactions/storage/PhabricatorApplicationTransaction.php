@@ -127,7 +127,19 @@ abstract class PhabricatorApplicationTransaction
   }
 
   public function hasComment() {
-    return $this->getComment() && strlen($this->getComment()->getContent());
+    if (!$this->getComment()) {
+      return false;
+    }
+
+    $content = $this->getComment()->getContent();
+
+    // If the content is empty or consists of only whitespace, don't count
+    // this as comment.
+    if (!strlen(trim($content))) {
+      return false;
+    }
+
+    return true;
   }
 
   public function getComment() {
@@ -175,6 +187,14 @@ abstract class PhabricatorApplicationTransaction
 
   public function getIsLockOverrideTransaction() {
     return (bool)$this->getMetadataValue('core.lock-override', false);
+  }
+
+  public function setTransactionGroupID($group_id) {
+    return $this->setMetadataValue('core.groupID', $group_id);
+  }
+
+  public function getTransactionGroupID() {
+    return $this->getMetadataValue('core.groupID', null);
   }
 
   public function attachComment(
@@ -425,19 +445,15 @@ abstract class PhabricatorApplicationTransaction
     $policy = PhabricatorPolicy::newFromPolicyAndHandle(
       $phid,
       $this->getHandleIfExists($phid));
+
+    $ref = $policy->newRef($this->getViewer());
+
     if ($this->renderingTarget == self::TARGET_HTML) {
-      switch ($policy->getType()) {
-        case PhabricatorPolicyType::TYPE_CUSTOM:
-          $policy->setHref('/transactions/'.$state.'/'.$this->getPHID().'/');
-          $policy->setWorkflow(true);
-          break;
-        default:
-          break;
-      }
-      $output = $policy->renderDescription();
+      $output = $ref->newTransactionLink($state, $this);
     } else {
-      $output = hsprintf('%s', $policy->getFullName());
+      $output = $ref->getPolicyDisplayName();
     }
+
     return $output;
   }
 
@@ -657,7 +673,6 @@ abstract class PhabricatorApplicationTransaction
           case PhabricatorMutedEdgeType::EDGECONST:
           case PhabricatorMutedByEdgeType::EDGECONST:
             return true;
-            break;
           case PhabricatorObjectMentionedByObjectEdgeType::EDGECONST:
             $record = PhabricatorEdgeChangeRecord::newFromTransaction($this);
             $add = $record->getAddedPHIDs();
@@ -700,6 +715,12 @@ abstract class PhabricatorApplicationTransaction
         switch ($edge_type) {
           case PhabricatorObjectMentionsObjectEdgeType::EDGECONST:
           case PhabricatorObjectMentionedByObjectEdgeType::EDGECONST:
+          case DifferentialRevisionDependsOnRevisionEdgeType::EDGECONST:
+          case DifferentialRevisionDependedOnByRevisionEdgeType::EDGECONST:
+          case ManiphestTaskHasCommitEdgeType::EDGECONST:
+          case DiffusionCommitHasTaskEdgeType::EDGECONST:
+          case DiffusionCommitHasRevisionEdgeType::EDGECONST:
+          case DifferentialRevisionHasCommitEdgeType::EDGECONST:
             return true;
           case PhabricatorProjectObjectHasProjectEdgeType::EDGECONST:
             // When an object is first created, we hide any corresponding
@@ -750,13 +771,25 @@ abstract class PhabricatorApplicationTransaction
       case PhabricatorTransactions::TYPE_TOKEN:
       case PhabricatorTransactions::TYPE_MFA:
         return true;
+      case PhabricatorTransactions::TYPE_SUBSCRIBERS:
+        // See T8952. When an application (usually Herald) modifies
+        // subscribers, this tends to be very uninteresting.
+        if ($this->isApplicationAuthor()) {
+          return true;
+        }
+        break;
       case PhabricatorTransactions::TYPE_EDGE:
         $edge_type = $this->getMetadataValue('edge:type');
         switch ($edge_type) {
           case PhabricatorObjectMentionsObjectEdgeType::EDGECONST:
           case PhabricatorObjectMentionedByObjectEdgeType::EDGECONST:
+          case DifferentialRevisionDependsOnRevisionEdgeType::EDGECONST:
+          case DifferentialRevisionDependedOnByRevisionEdgeType::EDGECONST:
+          case ManiphestTaskHasCommitEdgeType::EDGECONST:
+          case DiffusionCommitHasTaskEdgeType::EDGECONST:
+          case DiffusionCommitHasRevisionEdgeType::EDGECONST:
+          case DifferentialRevisionHasCommitEdgeType::EDGECONST:
             return true;
-            break;
           default:
             break;
         }
@@ -1100,6 +1133,8 @@ abstract class PhabricatorApplicationTransaction
         } else {
           $fragments = array();
           foreach ($moves as $move) {
+            $to_column = $move['columnPHID'];
+            $board_phid = $move['boardPHID'];
             $fragments[] = pht(
               '%s (%s)',
               $this->renderHandleLink($board_phid),
@@ -1345,35 +1380,29 @@ abstract class PhabricatorApplicationTransaction
 
   public function getActionStrength() {
     if ($this->isInlineCommentTransaction()) {
-      return 0.25;
+      return 25;
     }
 
     switch ($this->getTransactionType()) {
       case PhabricatorTransactions::TYPE_COMMENT:
-        return 0.5;
+        return 50;
       case PhabricatorTransactions::TYPE_SUBSCRIBERS:
         if ($this->isSelfSubscription()) {
           // Make this weaker than TYPE_COMMENT.
-          return 0.25;
-        }
-
-        if ($this->isApplicationAuthor()) {
-          // When applications (most often: Herald) change subscriptions it
-          // is very uninteresting.
-          return 0.000000001;
+          return 25;
         }
 
         // In other cases, subscriptions are more interesting than comments
         // (which are shown anyway) but less interesting than any other type of
         // transaction.
-        return 0.75;
+        return 75;
       case PhabricatorTransactions::TYPE_MFA:
         // We want MFA signatures to render at the top of transaction groups,
         // on top of the things they signed.
-        return 10;
+        return 1000;
     }
 
-    return 1.0;
+    return 100;
   }
 
   public function isCommentTransaction() {
@@ -1691,6 +1720,17 @@ abstract class PhabricatorApplicationTransaction
     }
 
     return array($done, $undone);
+  }
+
+  public function newGlobalSortVector() {
+    return id(new PhutilSortVector())
+      ->addInt(-$this->getDateCreated())
+      ->addString($this->getPHID());
+  }
+
+  public function newActionStrengthSortVector() {
+    return id(new PhutilSortVector())
+      ->addInt(-$this->getActionStrength());
   }
 
 

@@ -16,6 +16,21 @@ abstract class PhabricatorProjectController extends PhabricatorController {
   }
 
   protected function loadProject() {
+    return $this->loadProjectWithCapabilities(
+      array(
+        PhabricatorPolicyCapability::CAN_VIEW,
+      ));
+  }
+
+  protected function loadProjectForEdit() {
+    return $this->loadProjectWithCapabilities(
+      array(
+        PhabricatorPolicyCapability::CAN_VIEW,
+        PhabricatorPolicyCapability::CAN_EDIT,
+      ));
+  }
+
+  private function loadProjectWithCapabilities(array $capabilities) {
     $viewer = $this->getViewer();
     $request = $this->getRequest();
 
@@ -35,6 +50,7 @@ abstract class PhabricatorProjectController extends PhabricatorController {
 
     $query = id(new PhabricatorProjectQuery())
       ->setViewer($viewer)
+      ->requireCapabilities($capabilities)
       ->needMembers(true)
       ->needWatchers(true)
       ->needImages(true)
@@ -84,30 +100,6 @@ abstract class PhabricatorProjectController extends PhabricatorController {
     return null;
   }
 
-  public function buildApplicationMenu() {
-    $menu = $this->newApplicationMenu();
-
-    $profile_menu = $this->getProfileMenu();
-    if ($profile_menu) {
-      $menu->setProfileMenu($profile_menu);
-    }
-
-    $menu->setSearchEngine(new PhabricatorProjectSearchEngine());
-
-    return $menu;
-  }
-
-  protected function getProfileMenu() {
-    if (!$this->profileMenu) {
-      $engine = $this->getProfileMenuEngine();
-      if ($engine) {
-        $this->profileMenu = $engine->buildNavigation();
-      }
-    }
-
-    return $this->profileMenu;
-  }
-
   protected function buildApplicationCrumbs() {
     return $this->newApplicationCrumbs('profile');
   }
@@ -133,7 +125,11 @@ abstract class PhabricatorProjectController extends PhabricatorController {
         } else {
           switch ($mode) {
             case 'workboard':
-              $crumb_uri = $ancestor->getWorkboardURI();
+              if ($ancestor->getHasWorkboard()) {
+                $crumb_uri = $ancestor->getWorkboardURI();
+              } else {
+                $crumb_uri = $ancestor->getProfileURI();
+              }
               break;
             case 'profile':
             default:
@@ -188,7 +184,7 @@ abstract class PhabricatorProjectController extends PhabricatorController {
     $engine = id(new PhabricatorBoardResponseEngine())
       ->setViewer($viewer)
       ->setBoardPHID($board_phid)
-      ->setObjectPHID($object_phid)
+      ->setUpdatePHIDs(array($object_phid))
       ->setVisiblePHIDs($visible_phids)
       ->setSounds($sounds);
 
@@ -205,6 +201,31 @@ abstract class PhabricatorProjectController extends PhabricatorController {
       $result[] = '#'.$tag;
     }
     return implode(', ', $result);
+  }
+
+  final protected function newNavigation(
+    PhabricatorProject $project,
+    $item_identifier) {
+
+    $engine = $this->getProfileMenuEngine();
+
+    $view_list = $engine->newProfileMenuItemViewList();
+
+    // See PHI1247. If the "Workboard" item is removed from the menu, we will
+    // not be able to select it. This can happen if a user removes the item,
+    // then manually navigate to the workboard URI (or follows an older link).
+    // In this case, just render the menu with no selected item.
+    if ($view_list->getViewsWithItemIdentifier($item_identifier)) {
+      $view_list->setSelectedViewWithItemIdentifier($item_identifier);
+    }
+
+    $navigation = $view_list->newNavigationView();
+
+    if ($item_identifier === PhabricatorProject::ITEM_WORKBOARD) {
+      $navigation->addClass('project-board-nav');
+    }
+
+    return $navigation;
   }
 
 }
