@@ -527,7 +527,7 @@ return array(
     'rsrc/js/phuix/PHUIXExample.js' => 'c2c500a7',
     'rsrc/js/phuix/PHUIXFormControl.js' => '38c1f3fb',
     'rsrc/js/phuix/PHUIXIconView.js' => 'a5257c4e',
-    'rsrc/js/shoptet-buttons.js' => '47813ccb',
+    'rsrc/js/shoptet-buttons.js' => 'f126b57b',
   ),
   'symbols' => array(
     'almanac-css' => '2e050f4f',
@@ -900,7 +900,7 @@ return array(
     'releeph-request-differential-create-dialog' => '0ac1ea31',
     'releeph-request-typeahead-css' => 'bce37359',
     'setup-issue-css' => '5eed85b2',
-    'shoptet-buttons' => '47813ccb',
+    'shoptet-buttons' => 'f126b57b',
     'sprite-login-css' => '18b368a6',
     'sprite-tokens-css' => 'f1896dc5',
     'syntax-default-css' => '055fc231',
