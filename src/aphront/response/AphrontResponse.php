@@ -153,7 +153,7 @@ abstract class AphrontResponse extends Phobject {
 
     // On a small number of pages, including the Stripe workflow and the
     // ReCAPTCHA challenge, we embed external Javascript directly.
-    $csp[] = $this->newContentSecurityPolicy('script-src', $default);
+    $csp[] = $this->newContentSecurityPolicy('script-src', "$default https://www.shoptet.cz");
 
     // We need to specify that we can connect to ourself in order for AJAX
     // requests to work.
