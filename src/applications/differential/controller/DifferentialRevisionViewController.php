@@ -1,5 +1,7 @@
 <?php
 
+require_once "../../extra/toggl/toggl.php";
+
 final class DifferentialRevisionViewController
   extends DifferentialController {
 
@@ -782,6 +784,13 @@ final class DifferentialRevisionViewController
     if ($relationship_submenu) {
       $curtain->addAction($relationship_submenu);
     }
+
+    $spent = toggle_spent($revision->getMonogram());
+    $togglPanel = id(new PHUICurtainPanelTogglView())
+      ->setEfforts($spent)
+      ->getPanel()
+      ->setOrder(10000);
+    $curtain->addPanel($togglPanel);
 
     $repository = $revision->getRepository();
     if ($repository && $repository->canPerformAutomation()) {

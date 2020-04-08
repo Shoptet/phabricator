@@ -1994,6 +1994,7 @@ phutil_register_library_map(array(
     'PHUICurtainExtension' => 'view/extension/PHUICurtainExtension.php',
     'PHUICurtainObjectRefListView' => 'view/phui/PHUICurtainObjectRefListView.php',
     'PHUICurtainObjectRefView' => 'view/phui/PHUICurtainObjectRefView.php',
+    'PHUICurtainPanelTogglView' => 'view/layout/PHUICurtainPanelTogglView.php',
     'PHUICurtainPanelView' => 'view/layout/PHUICurtainPanelView.php',
     'PHUICurtainView' => 'view/layout/PHUICurtainView.php',
     'PHUIDiffGraphView' => 'infrastructure/diff/view/PHUIDiffGraphView.php',

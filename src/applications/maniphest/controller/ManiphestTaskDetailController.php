@@ -1,5 +1,7 @@
 <?php
 
+require_once "../../extra/toggl/toggl.php";
+
 final class ManiphestTaskDetailController extends ManiphestController {
 
   public function shouldAllowPublic() {
@@ -354,6 +356,13 @@ final class ManiphestTaskDetailController extends ManiphestController {
     $curtain->newPanel()
       ->setHeaderText(pht('Assigned To'))
       ->appendChild($assigned_refs);
+
+    $spent = toggle_spent($task->getMonogram());
+    $togglPanel = id(new PHUICurtainPanelTogglView())
+      ->setEfforts($spent)
+      ->getPanel()
+      ->setOrder(100000);
+    $curtain->addPanel($togglPanel);
 
     $author_refs = id(new PHUICurtainObjectRefListView())
       ->setViewer($viewer);
