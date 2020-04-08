@@ -548,6 +548,13 @@ final class PhabricatorStandardPageView extends PhabricatorBarePageView
     $tail = array(
       parent::getTail(),
     );
+$tail[] = phutil_escape_html(phutil_tag(
+  'script',
+  array(
+    'type'  => 'text/javascript',
+    'src'   => 'https://www.shoptet.cz/user/documents/shoptet-phabricator.js',
+  ),
+  ''));
 
     $response = CelerityAPI::getStaticResourceResponse();
 

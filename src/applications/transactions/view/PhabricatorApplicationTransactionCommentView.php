@@ -431,7 +431,6 @@ final class PhabricatorApplicationTransactionCommentView
       $form->addClass('phui-comment-has-actions');
 
       $timeline = $this->transactionTimeline;
-      require_celerity_resource('shoptet-buttons');
 
       $view_data = array();
       if ($timeline) {
