@@ -30,6 +30,9 @@ final class PHUICurtainPanelTogglView {
   {
     $panel = new PHUICurtainPanelView();
     $panel->setHeaderText($this->getHeaderText());
+    if ($this->spent['error']) {
+      $panel->appendChild($this->spent['error']);
+    }
     $panel->appendChild($this->getUsersView());
     return $panel;
   }
